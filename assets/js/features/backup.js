@@ -39,7 +39,8 @@
 
   /* ---- Full backup -------------------------------------------------------- */
 
-  function exportBackup() {
+  function exportBackup(options) {
+    var opts = options || {};
     var db = CF.store.get();
     var payload = {
       _format: FILE_TAG,
@@ -48,12 +49,17 @@
       _app: 'CleanFlow',
       data: db
     };
-    var name = slug(db.business.name) + '-backup-' + stamp() + '.json';
+    var name = slug(db.business.name) + '-' +
+               (opts.suffix || 'backup') + '-' + stamp() + '.json';
     download(name, JSON.stringify(payload, null, 2), 'application/json');
 
-    CF.store.commit('Backup', function (d) {
-      d.settings.lastBackupAt = new Date().toISOString();
-    }, { noUndo: true });
+    // A pre-restore safety copy is not the user's own backup habit, so it
+    // must not reset the "last backed up" reminder.
+    if (!opts.silent) {
+      CF.store.commit('Backup', function (d) {
+        d.settings.lastBackupAt = new Date().toISOString();
+      }, { noUndo: true });
+    }
 
     return name;
   }
@@ -79,22 +85,30 @@
           return;
         }
 
-        var data = parsed && parsed._format === FILE_TAG ? parsed.data : parsed;
-        if (!data || typeof data !== 'object' || !Array.isArray(data.clients)) {
-          reject(new Error('That file is missing CleanFlow data. Pick the .json backup CleanFlow created.'));
-          return;
-        }
+        var tagged = !!(parsed && parsed._format === FILE_TAG);
+        var data = tagged ? parsed.data : parsed;
+
+        var verdict = validateShape(data, tagged);
+        if (!verdict.ok) { reject(new Error(verdict.message)); return; }
+
+        var fileVersion = tagged ? Number(parsed._version) : Number(data && data.schemaVersion);
 
         resolve({
           data: data,
-          exportedAt: parsed._exportedAt || null,
+          tagged: tagged,
+          exportedAt: (tagged && parsed._exportedAt) || null,
           businessName: (data.business && data.business.name) || '',
+          version: isFinite(fileVersion) ? fileVersion : null,
+          // A file from a newer CleanFlow may carry fields this build drops on
+          // save. The user is told rather than quietly downgraded.
+          newerThanApp: isFinite(fileVersion) && fileVersion > CF.schema.VERSION,
+          warnings: verdict.warnings,
           counts: {
-            clients:  (data.clients  || []).filter(notDeleted).length,
-            jobs:     (data.jobs     || []).filter(notDeleted).length,
-            invoices: (data.invoices || []).filter(notDeleted).length,
-            quotes:   (data.quotes   || []).filter(notDeleted).length,
-            expenses: (data.expenses || []).filter(notDeleted).length
+            clients:  countLive(data.clients),
+            jobs:     countLive(data.jobs),
+            invoices: countLive(data.invoices),
+            quotes:   countLive(data.quotes),
+            expenses: countLive(data.expenses)
           }
         });
       };
@@ -102,7 +116,66 @@
     });
   }
 
-  function notDeleted(r) { return r && !r.deletedAt; }
+  function notDeleted(r) { return r && typeof r === 'object' && !r.deletedAt; }
+
+  function countLive(list) {
+    return Array.isArray(list) ? list.filter(notDeleted).length : 0;
+  }
+
+  /**
+   * Is this actually a CleanFlow backup?
+   *
+   * An untagged file has to look convincingly like one before we let it
+   * replace somebody's business — any JSON with a `clients` array used to
+   * sail through. Records that are not objects, or have no id, are counted
+   * and reported instead of being imported as junk.
+   */
+  var COLLECTIONS = ['clients', 'jobs', 'invoices', 'quotes', 'expenses', 'services'];
+
+  function validateShape(data, tagged) {
+    var warnings = [];
+
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { ok: false, message: 'That file does not contain CleanFlow data. ' +
+        'Pick the .json backup CleanFlow created.' };
+    }
+
+    var present = COLLECTIONS.filter(function (k) { return Array.isArray(data[k]); });
+    var hasSettings = data.settings && typeof data.settings === 'object';
+    var hasBusiness = data.business && typeof data.business === 'object';
+
+    // A tagged file only needs one recognisable collection. An untagged one
+    // has to clear a higher bar, because anything could be handing us JSON.
+    var convincing = tagged
+      ? present.length >= 1
+      : (present.length >= 3 && (hasSettings || hasBusiness));
+
+    if (!convincing) {
+      return { ok: false, message: present.length
+        ? 'That file is missing most of a CleanFlow backup, so restoring it ' +
+          'would wipe your data and put almost nothing back. Pick the .json ' +
+          'file CleanFlow exported.'
+        : 'That file does not contain CleanFlow data. Pick the .json backup ' +
+          'CleanFlow created.' };
+    }
+
+    var badTotal = 0;
+    present.forEach(function (key) {
+      var bad = data[key].filter(function (r) {
+        return !r || typeof r !== 'object' || Array.isArray(r) || !r.id;
+      }).length;
+      if (bad) { badTotal += bad; warnings.push(bad + ' unreadable ' + key.slice(0, -1) + ' record(s)'); }
+    });
+
+    // Entirely made of junk is a corrupt file, not a recoverable one.
+    var totalRows = present.reduce(function (a, k) { return a + data[k].length; }, 0);
+    if (totalRows > 0 && badTotal === totalRows) {
+      return { ok: false, message: 'Every record in that file is unreadable, so it ' +
+        'cannot be restored. Try an older backup.' };
+    }
+
+    return { ok: true, warnings: warnings };
+  }
 
   /** Apply an inspected backup. Undo still works immediately afterwards. */
   function applyRestore(data) {
@@ -113,11 +186,43 @@
 
   /* ---- CSV ---------------------------------------------------------------- */
 
+  /**
+   * One CSV cell.
+   *
+   * Numbers are written through untouched — quoting a negative amount as
+   * text ("'-54") is what turns an accountant's SUM column into gibberish.
+   * Only text is screened for the leading characters that make Excel, Sheets
+   * and Numbers evaluate a cell as a formula, and the check looks past any
+   * leading whitespace, tab or newline used to smuggle one in.
+   */
   function csvCell(value) {
-    var s = value === null || value === undefined ? '' : String(value);
-    // A leading =, +, - or @ makes spreadsheets treat text as a formula.
-    if (/^[=+\-@]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    if (value === null || value === undefined) return '';
+
+    if (typeof value === 'number') {
+      return isFinite(value) ? String(value) : '';
+    }
+    if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+
+    var s = String(value);
+
+    // \u0000-\u001F covers tab, CR and LF; \u00A0 and friends cover the
+    // non-breaking spaces that get pasted in from the web.
+    if (/^[\s\u0000-\u001F\u00A0\u2000-\u200B\uFEFF]*[=+\-@\t\r]/.test(s)) {
+      s = "'" + s;
+    }
+
+    if (/["\r\n,]/.test(s)) {
+      // Normalise embedded breaks to CRLF so Excel keeps the row together.
+      s = s.replace(/\r\n|\r|\n/g, '\r\n');
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  /** Amounts must reach the spreadsheet as numbers, not decorated strings. */
+  function csvNumber(value) {
+    var n = Number(value);
+    return isFinite(n) ? n : 0;
   }
 
   function toCsv(headers, rows) {
@@ -139,7 +244,7 @@
           var st = CF.q.clientStats(c.id);
           return [c.name, c.phone, c.email, c.address, c.propertyType, c.beds, c.baths,
                   CF.q.serviceName(c.preferredServiceId, ''), c.frequency, c.status,
-                  st.jobsCompleted, st.lifetimeValue, c.notes];
+                  csvNumber(st.jobsCompleted), csvNumber(st.lifetimeValue), c.notes];
         })
       );
     } else if (kind === 'jobs') {
@@ -148,8 +253,9 @@
         CF.q.sortByWhen(CF.q.jobs(), 'desc').map(function (j) {
           var extras = (j.extras || []).reduce(function (a, e) { return a + (Number(e.amount) || 0); }, 0);
           return [j.date, j.time, CF.q.clientName(j.clientId, j.clientName),
-                  CF.q.serviceName(j.serviceId, j.serviceName), j.price, extras,
-                  CF.q.jobTotal(j), j.status, j.address, j.notes];
+                  CF.q.serviceName(j.serviceId, j.serviceName), csvNumber(j.price),
+                  csvNumber(extras), csvNumber(CF.q.jobTotal(j)),
+                  j.status, j.address, j.notes];
         })
       );
     } else if (kind === 'invoices') {
@@ -157,8 +263,8 @@
         ['Number', 'Issued', 'Due', 'Client', 'Total', 'Received', 'Remaining', 'Status'],
         CF.q.invoices().map(function (i) {
           return ['#' + i.number, i.issueDate, i.dueDate,
-                  CF.q.clientName(i.clientId, i.clientName), i.total,
-                  CF.q.invoiceReceived(i), CF.q.invoiceRemaining(i),
+                  CF.q.clientName(i.clientId, i.clientName), csvNumber(i.total),
+                  csvNumber(CF.q.invoiceReceived(i)), csvNumber(CF.q.invoiceRemaining(i)),
                   CF.q.invoiceStatus(i).label];
         })
       );
@@ -166,21 +272,23 @@
       csv = toCsv(
         ['Date', 'Category', 'Amount', 'Note'],
         CF.q.expenses().slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; })
-          .map(function (e) { return [e.date, e.category, e.amount, e.note]; })
+          .map(function (e) { return [e.date, e.category, csvNumber(e.amount), e.note]; })
       );
     } else if (kind === 'quotes') {
       csv = toCsv(
         ['Number', 'Date', 'Client', 'Service', 'Price', 'Est. cost', 'Est. profit', 'Margin %', 'Status'],
         CF.q.quotes().map(function (q) {
           return ['#' + q.number, q.date, q.clientName || CF.q.clientName(q.clientId),
-                  CF.q.serviceName(q.serviceId, ''), q.price, q.cost, q.profit, q.margin, q.status];
+                  CF.q.serviceName(q.serviceId, ''), csvNumber(q.price), csvNumber(q.cost),
+                  csvNumber(q.profit), csvNumber(q.margin), q.status];
         })
       );
     } else if (kind === 'payments') {
       csv = toCsv(
         ['Date', 'Client', 'Invoice', 'Amount', 'Method'],
         CF.q.paymentsIn().map(function (p) {
-          return [p.date, CF.q.clientName(p.clientId), '#' + p.invoiceNumber, p.amount, p.method];
+          return [p.date, CF.q.clientName(p.clientId), '#' + p.invoiceNumber,
+                  csvNumber(p.amount), p.method];
         })
       );
     } else {

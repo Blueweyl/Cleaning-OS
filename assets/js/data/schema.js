@@ -239,22 +239,51 @@
    * Fill in anything a stored database is missing. Runs on every load, so
    * an older backup restored into a newer build still opens cleanly.
    */
+  /**
+   * Drop anything that is not a usable record: nulls, strings, arrays and
+   * objects with no id all crash the views downstream. Duplicate ids are
+   * collapsed to the first occurrence so lookups stay deterministic.
+   */
+  function sanitiseRecords(list) {
+    if (!Array.isArray(list)) return null;
+    var seen = Object.create(null);
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (!r || typeof r !== 'object' || Array.isArray(r)) continue;
+      if (!r.id || typeof r.id !== 'string') continue;
+      if (seen[r.id]) continue;
+      seen[r.id] = true;
+      out.push(r);
+    }
+    return out;
+  }
+
   function migrate(data) {
     var base = emptyDatabase();
-    if (!data || typeof data !== 'object') return base;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return base;
 
     var out = {};
     Object.keys(base).forEach(function (key) {
       var incoming = data[key];
       if (incoming === undefined || incoming === null) { out[key] = base[key]; return; }
       if (Array.isArray(base[key])) {
-        out[key] = Array.isArray(incoming) ? incoming : base[key];
+        var cleaned = sanitiseRecords(incoming);
+        out[key] = cleaned === null ? base[key] : cleaned;
       } else if (typeof base[key] === 'object') {
-        out[key] = Object.assign({}, base[key], incoming);
+        out[key] = (incoming && typeof incoming === 'object' && !Array.isArray(incoming))
+          ? Object.assign({}, base[key], incoming)
+          : base[key];
       } else {
         out[key] = incoming;
       }
     });
+
+    // Counters must stay ahead of the documents already issued, or restoring
+    // an older backup starts handing out invoice numbers that already exist.
+    out.counters = Object.assign({}, base.counters, out.counters);
+    out.counters.invoice = highestNumber(out.invoices, out.counters.invoice);
+    out.counters.quote   = highestNumber(out.quotes,   out.counters.quote);
 
     // A restored file must never arrive with no way to quote work.
     if (!out.services.length)   out.services = defaultServices();
@@ -263,6 +292,15 @@
 
     out.schemaVersion = SCHEMA_VERSION;
     return out;
+  }
+
+  function highestNumber(rows, current) {
+    var top = Number(current) || 100;
+    (rows || []).forEach(function (r) {
+      var n = parseInt(r && r.number, 10);
+      if (isFinite(n) && n > top) top = n;
+    });
+    return top;
   }
 
   CF.schema = {
@@ -283,6 +321,7 @@
     defaultSettings: defaultSettings,
     defaultBusiness: defaultBusiness,
     emptyDatabase: emptyDatabase,
-    migrate: migrate
+    migrate: migrate,
+    sanitiseRecords: sanitiseRecords
   };
 })(window.CF = window.CF || {});

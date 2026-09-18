@@ -12,6 +12,40 @@
   var S = function () { return CF.store; };
   var F = function () { return CF.fmt; };
 
+  /* ---- Per-client index ---------------------------------------------------
+     clientStats() used to scan every job and every invoice, and the Home and
+     Grow screens call it once per client. That is fine for a working solo
+     cleaner and quadratic for anyone with years of history. The index is
+     built once per change and thrown away whenever the store moves.        */
+
+  var index = null;
+
+  function invalidate() { index = null; }
+
+  function buildIndex() {
+    var byClientJobs = Object.create(null);
+    var byClientInvoices = Object.create(null);
+
+    (S().get().jobs || []).forEach(function (j) {
+      if (!j || j.deletedAt || !j.clientId) return;
+      (byClientJobs[j.clientId] || (byClientJobs[j.clientId] = [])).push(j);
+    });
+    (S().get().invoices || []).forEach(function (i) {
+      if (!i || i.deletedAt || !i.clientId) return;
+      (byClientInvoices[i.clientId] || (byClientInvoices[i.clientId] = [])).push(i);
+    });
+
+    return { jobs: byClientJobs, invoices: byClientInvoices };
+  }
+
+  function idx() {
+    if (!index) index = buildIndex();
+    return index;
+  }
+
+  // store.js calls invalidate() directly on every mutation — including the
+  // ones that skip notify() — so there is no subscriber to fall out of sync.
+
   /* ---- Lookups ---------------------------------------------------------- */
 
   function client(id)  { return S().find('clients', id); }
@@ -266,24 +300,34 @@
   /* ---- Client rollups ------------------------------------------------------ */
 
   function clientStats(clientId) {
-    var done = jobsForClient(clientId).filter(function (j) { return j.status === 'completed'; });
-    var paid = 0;
-    invoices().forEach(function (inv) {
-      if (inv.clientId === clientId) paid += invoiceReceived(inv);
-    });
-    var last = done.length ? (done[0].completedDate || done[0].date) : null;
-    var next = upcomingJobs().concat(todaysJobs())
-      .filter(function (j) { return j.clientId === clientId; })
-      .sort(function (a, b) { return a.date < b.date ? -1 : 1; })[0];
+    var mine = idx().jobs[clientId] || [];
+    var theirInvoices = idx().invoices[clientId] || [];
+    var today = F().today();
+
+    var doneCount = 0, lastDone = null, next = null, paid = 0, outstanding = 0;
+
+    for (var i = 0; i < mine.length; i++) {
+      var j = mine[i];
+      if (j.status === 'completed') {
+        doneCount++;
+        var when = j.completedDate || j.date;
+        if (!lastDone || when > lastDone) lastDone = when;
+      } else if (j.status !== 'cancelled' && j.date >= today) {
+        if (!next || j.date < next.date) next = j;
+      }
+    }
+
+    for (var k = 0; k < theirInvoices.length; k++) {
+      paid += invoiceReceived(theirInvoices[k]);
+      outstanding += invoiceRemaining(theirInvoices[k]);
+    }
 
     return {
-      jobsCompleted: done.length,
+      jobsCompleted: doneCount,
       lifetimeValue: paid,
-      lastJobDate: last,
-      nextJob: next || null,
-      outstanding: invoices()
-        .filter(function (i) { return i.clientId === clientId; })
-        .reduce(function (a, i) { return a + invoiceRemaining(i); }, 0)
+      lastJobDate: lastDone,
+      nextJob: next,
+      outstanding: outstanding
     };
   }
 
@@ -488,6 +532,7 @@
     clientStats: clientStats, intervalDays: intervalDays,
     readyToRebook: readyToRebook, readyForReview: readyForReview,
     referralCandidates: referralCandidates,
-    needsAttention: needsAttention, search: search
+    needsAttention: needsAttention, search: search,
+    invalidate: invalidate
   };
 })(window.CF = window.CF || {});

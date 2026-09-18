@@ -28,11 +28,21 @@
     CF.router.start(function () { repaint(); });
     CF.store.subscribe(function () { /* views repaint explicitly */ });
 
-    // Never lose the last few hundred milliseconds of typing.
-    window.addEventListener('beforeunload', function () { CF.store.flush(); });
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') CF.store.flush();
+    // Never lose the last few hundred milliseconds of typing. A closing page
+    // does not wait for promises, so the synchronous path runs first and the
+    // async one only tops it up.
+    window.addEventListener('pagehide', function () { CF.store.flushSync(); });
+    window.addEventListener('beforeunload', function () {
+      CF.store.flushSync();
+      CF.store.flush();
     });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') { CF.store.flushSync(); CF.store.flush(); }
+    });
+
+    // A tab that loses writer status must repaint into its read-only state.
+    if (CF.tabguard) CF.tabguard.onChange(function () { repaint(); });
+    CF.store.onSaveState(function () { repaintBanners(); });
 
     // Global keyboard shortcuts, skipped while typing.
     document.addEventListener('keydown', function (e) {
@@ -60,6 +70,13 @@
     var db = CF.store.get();
     CF.views.jobs.stopTimer();
 
+    // If the stored data could not be read, nothing else may render: the app
+    // must not present an empty database that the next edit would save over.
+    if (CF.store.isLocked()) {
+      CF.dom.mount(root, recoveryScreen());
+      return;
+    }
+
     // Onboarding owns the whole screen until it hands over — including its
     // final "You're ready!" step, which runs after settings are already saved.
     if (CF.views.onboarding.isActive()) {
@@ -69,6 +86,7 @@
 
     var route = CF.router.get();
     CF.dom.mount(root, el('div.app', [
+      safetyBanners(),
       db.settings.demoMode ? demoBanner() : null,
       topbar(route),
       contentHost = el('main#main.page', { tabindex: '-1' }, screenFor(route)),
@@ -124,6 +142,80 @@
     return notFound();
   }
 
+  /**
+   * Shown when CleanFlow could not read what is on this device. Writing is
+   * disabled until the user picks one of the two safe ways forward, so a bad
+   * read can never turn into a blank database saved over good data.
+   */
+  function recoveryScreen() {
+    var info = CF.store.lockInfo() || {};
+    var corrupt = info.reason === 'corrupt';
+
+    return el('div.onboard', [
+      el('div.onboard__card.anim-fade-up', [
+        el('div.row.row-3.mb-5', [
+          el('div.brand__mark.brand__mark--lg', { 'aria-hidden': 'true' }, 'C'),
+          el('div', { style: { fontWeight: '800', fontSize: '18px' } }, 'CleanFlow')
+        ]),
+        el('h1', { style: { fontSize: '24px', fontWeight: '800', margin: 0, lineHeight: '1.25' } },
+          corrupt ? 'Your saved data could not be read'
+                  : 'CleanFlow could not open your data'),
+        el('p', { style: { fontSize: '15px', color: 'var(--text-muted)', marginTop: '10px', lineHeight: '1.6' } },
+          corrupt
+            ? 'The file on this device is damaged. It has been set aside rather than deleted, ' +
+              'so nothing has been overwritten — but CleanFlow cannot read it.'
+            : 'Your browser would not let CleanFlow read its storage. This is usually temporary. ' +
+              'Nothing has been changed or deleted.'),
+
+        el('div.callout.callout--info.mt-5',
+          'Editing is switched off until you choose below, so your saved data cannot be ' +
+          'overwritten by an empty one.'),
+
+        el('div.stack.stack-3.mt-6', [
+          el('button.btn.btn--primary.btn--lg.btn--block', {
+            type: 'button', autofocus: true,
+            onclick: function () { location.reload(); }
+          }, 'Try Again'),
+          el('button.btn.btn--secondary.btn--lg.btn--block', {
+            type: 'button',
+            onclick: function () { pickBackupFile(function () { repaint(); }); }
+          }, 'Restore From a Backup File'),
+          el('button.btn.btn--secondary.btn--block', {
+            type: 'button', style: { color: 'var(--bad-text)' },
+            onclick: startOverFromLock
+          }, 'Start Over With an Empty CleanFlow')
+        ]),
+
+        info.quarantinedAs ? el('p.meta.mt-5',
+          'The unreadable copy is kept in this browser under "' + info.quarantinedAs +
+          '" in case it can be recovered.') : null,
+
+        info.error ? el('details.mt-4', [
+          el('summary.meta', { style: { cursor: 'pointer' } }, 'Technical details'),
+          el('pre', {
+            style: { fontSize: '11px', background: 'var(--chip)', padding: '12px',
+                     borderRadius: '8px', overflow: 'auto', color: 'var(--text-muted)' }
+          }, String(info.error && (info.error.message || info.error)))
+        ]) : null
+      ])
+    ]);
+  }
+
+  function startOverFromLock() {
+    CF.ui.confirm({
+      title: 'Start over with an empty CleanFlow?',
+      message: 'Your unreadable data stays where it is, but CleanFlow will begin saving a ' +
+               'fresh, empty database over it. If you have a backup file, restore that instead.',
+      confirmLabel: 'Start Empty', cancelLabel: 'Go Back', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      CF.store.replace(CF.schema.emptyDatabase(), 'Start over');
+      CF.views.onboarding.reset();
+      CF.router.go('#/home');
+      repaint();
+    });
+  }
+
   function notFound() {
     return CF.ui.empty({
       title: 'That screen doesn\'t exist',
@@ -150,6 +242,63 @@
   }
 
   /* ---- Chrome ------------------------------------------------------------- */
+
+  /**
+   * Anything that threatens the user's data gets a persistent bar, not a
+   * toast — a toast they missed is a toast that never happened.
+   */
+  function safetyBanners() {
+    var bars = [];
+
+    if (CF.tabguard && !CF.tabguard.canWrite()) {
+      bars.push(bar('warn',
+        '👁 Read-only — CleanFlow is already open in another tab. Changes here will not be saved.',
+        'Use This Tab', function () {
+          CF.tabguard.takeOver();
+          CF.ui.toast('This tab is now the one that saves');
+          repaint();
+        }));
+    }
+
+    var storage = CF.storage.describe();
+    if (storage.mode === 'memory') {
+      bars.push(bar('bad',
+        '⚠ This browser is not saving anything. Export a backup before you close this tab.',
+        'Export Backup', function () {
+          CF.backup.exportBackup();
+          CF.ui.toast('Backup downloaded');
+        }));
+    }
+
+    var err = CF.store.lastSaveError();
+    if (err) {
+      bars.push(bar('bad',
+        '⚠ ' + (err.quota
+          ? 'This device is out of space — your latest changes are not saved.'
+          : 'Your latest changes could not be saved to this device.') +
+        ' CleanFlow is still retrying.',
+        'Export Backup', function () {
+          CF.backup.exportBackup();
+          CF.ui.toast('Backup downloaded');
+        }));
+    }
+
+    return bars.length ? el('div.no-print', bars) : null;
+
+    function bar(tone, message, actionLabel, onAction) {
+      return el('div.safety-bar.safety-bar--' + tone, [
+        el('span', message),
+        onAction ? el('button.btn.btn--sm', {
+          type: 'button',
+          style: { background: 'rgba(255,255,255,0.18)', color: '#fff' },
+          onclick: onAction
+        }, actionLabel) : null
+      ]);
+    }
+  }
+
+  /** Cheap path for save-state changes: re-render without losing scroll. */
+  function repaintBanners() { repaint(); }
 
   function demoBanner() {
     return el('div.demo-banner.no-print', [
@@ -353,22 +502,53 @@
     function inspect(file) {
       CF.backup.inspectFile(file).then(function (info) {
         var c = info.counts;
+        var live = CF.store.get();
+        var hereNow = CF.q.activeClients().length + CF.q.jobs().length;
+
+        var lines = [];
+        lines.push((info.businessName ? '"' + info.businessName + '"' : 'This backup') +
+          (info.exportedAt
+            ? ' was exported ' + CF.fmt.agoPhrase(CF.fmt.toKey(info.exportedAt)) + '.'
+            : '.'));
+        lines.push('It contains ' + c.clients + ' clients, ' + c.jobs + ' jobs, ' +
+          c.invoices + ' invoices, ' + c.quotes + ' quotes and ' + c.expenses + ' expenses.');
+
+        if (!info.tagged) {
+          lines.push('⚠ It is missing CleanFlow\'s backup marker, so it may have been ' +
+            'edited by hand.');
+        }
+        if (info.newerThanApp) {
+          lines.push('⚠ It was made by a newer version of CleanFlow. Anything this version ' +
+            'does not understand will be dropped when you next save.');
+        }
+        if (info.warnings && info.warnings.length) {
+          lines.push('⚠ Skipping ' + info.warnings.join(', ') + '.');
+        }
+        if (hereNow > 0) {
+          lines.push('This replaces the ' + CF.fmt.plural(CF.q.activeClients().length, 'client') +
+            ' and ' + CF.fmt.plural(CF.q.jobs().length, 'job') + ' already on this device.');
+        }
+
         CF.ui.confirm({
           title: 'Restore this backup?',
-          message: (info.businessName ? '"' + info.businessName + '" — ' : '') +
-                   (info.exportedAt
-                     ? 'exported ' + CF.fmt.agoPhrase(CF.fmt.toKey(info.exportedAt)) + '. '
-                     : '') +
-                   'It contains ' + c.clients + ' clients, ' + c.jobs + ' jobs, ' +
-                   c.invoices + ' invoices, ' + c.quotes + ' quotes and ' +
-                   c.expenses + ' expenses. ' +
-                   'Everything currently on this device is replaced.',
-          confirmLabel: 'Restore', danger: true
+          message: lines.join(' '),
+          confirmLabel: 'Restore', cancelLabel: 'Keep What I Have', danger: true
         }).then(function (ok) {
           if (!ok) return;
+
+          // Take a safety copy of what is here before replacing it, so a
+          // restore of the wrong file is never a one-way door.
+          if (hereNow > 0 && !CF.store.isLocked()) {
+            try { CF.backup.exportBackup({ silent: true, suffix: 'before-restore' }); }
+            catch (e) { /* a failed safety copy must not block the restore */ }
+          }
+
           CF.backup.applyRestore(info.data).then(function () {
-            CF.ui.toast('Backup restored', {
-              undo: function () { CF.store.undo(); repaint(); }
+            CF.ui.toast(hereNow > 0
+              ? 'Backup restored — your previous data was saved to your downloads first'
+              : 'Backup restored', {
+              undo: function () { CF.store.undo(); repaint(); },
+              duration: 8000
             });
             if (onDone) onDone();
             repaint();

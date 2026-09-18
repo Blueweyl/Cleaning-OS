@@ -18,8 +18,14 @@
   var undoStack = [];
   var saveTimer = null;
   var pendingSave = false;
+  var saveInFlight = false;
   var saveError = null;
+  var retryCount = 0;
+  var locked = null;         // set when the stored data could not be read
+  var loadNotice = null;
   var MAX_UNDO = 25;
+  var MAX_RETRY_DELAY = 30000;
+  var writeSeq = 0;   // bumped on every change, so a slow write knows it is stale
 
   /* ---- Ids ------------------------------------------------------------- */
 
@@ -34,11 +40,41 @@
   function init() {
     return CF.storage.init()
       .then(function () { return CF.storage.load(); })
-      .then(function (stored) {
-        db = CF.schema.migrate(stored);
+      .then(function (result) {
+        // A failed read is not an empty store. Boot into a locked, read-only
+        // state instead of handing the user a blank database that the next
+        // keystroke would write over the top of their real data.
+        if (!result.ok) {
+          locked = {
+            reason: result.corrupt ? 'corrupt' : 'unreadable',
+            error: result.error,
+            quarantinedAs: result.quarantinedAs || null
+          };
+          db = CF.schema.migrate(null);
+          invalidateDerived();
+          return db;
+        }
+        locked = null;
+        loadNotice = result.recoveredFrom
+          ? 'Recovered your most recent changes from this device\'s backup copy.'
+          : (result.corrupt ? 'Some stored data was unreadable and has been set aside.' : null);
+        db = CF.schema.migrate(result.data);
+        invalidateDerived();
         return db;
       });
   }
+
+  /* ---- Safety lock --------------------------------------------------------
+     While locked, nothing is written to disk. The user is told what happened
+     and offered the only two safe ways out: restore a backup, or start fresh
+     (which they must confirm).                                              */
+
+  function isLocked() { return !!locked; }
+  function lockInfo() { return locked; }
+  function takeLoadNotice() { var n = loadNotice; loadNotice = null; return n; }
+
+  /** Deliberately clear the lock — the user has chosen to overwrite. */
+  function unlock() { locked = null; schedule(); }
 
   function get() { return db; }
 
@@ -55,30 +91,100 @@
     });
   }
 
+  /**
+   * Drop anything derived from the database. Called on every mutation, not
+   * from a change subscriber — a `silent` commit skips notify(), and a cached
+   * index that outlives the data it summarises is a correctness bug.
+   */
+  function invalidateDerived() {
+    if (CF.q && CF.q.invalidate) CF.q.invalidate();
+  }
+
   /* ---- Persistence ------------------------------------------------------ */
 
+  /**
+   * Persist now. The pending flag is only cleared once the write has actually
+   * landed — clearing it up front means a failed save is never retried and the
+   * change is lost with nothing left to say so.
+   */
   function flush() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (locked) return Promise.resolve();          // never write over data we could not read
     if (!pendingSave) return Promise.resolve();
-    pendingSave = false;
+    if (saveInFlight) return Promise.resolve();    // the in-flight write will pick up the latest db
+
+    saveInFlight = true;
+    var snapshotSeq = writeSeq;
+
     return CF.storage.save(db)
-      .then(function () { saveError = null; })
-      .catch(function (err) {
-        saveError = err;
-        console.error('[CleanFlow] save failed', err);
-        if (CF.ui && CF.ui.toast) {
-          CF.ui.toast('Could not save to this device — export a backup now', { tone: 'bad', sticky: true });
+      .then(function () {
+        saveInFlight = false;
+        // Only settled if nothing changed while the write was in flight.
+        if (writeSeq === snapshotSeq) pendingSave = false;
+        else schedule();
+        retryCount = 0;
+        if (saveError) {
+          saveError = null;
+          if (CF.ui && CF.ui.toast) CF.ui.toast('Saved — your data is safe again', { tone: 'ok' });
         }
+        notifySaveState();
+      })
+      .catch(function (err) {
+        saveInFlight = false;
+        saveError = err;                 // pendingSave stays true
+        console.error('[CleanFlow] save failed', err);
+
+        // Back off, but keep trying: a quota error often clears once the user
+        // frees space, and a locked database usually frees up on its own.
+        retryCount += 1;
+        var delay = Math.min(500 * Math.pow(2, retryCount - 1), MAX_RETRY_DELAY);
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(flush, delay);
+
+        if (retryCount === 1 && CF.ui && CF.ui.toast) {
+          CF.ui.toast(err && err.quota
+            ? 'This device is out of space — export a backup now'
+            : 'Could not save to this device — export a backup now',
+            { tone: 'bad', sticky: true });
+        }
+        notifySaveState();
       });
   }
 
   function schedule() {
     pendingSave = true;
+    writeSeq += 1;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(flush, 400);
   }
 
+  /**
+   * Synchronous last chance, for `pagehide`. Promises do not get to settle
+   * while a tab is closing, so an async save can simply never run.
+   */
+  function flushSync() {
+    if (locked || !pendingSave) return true;
+    var ok = CF.storage.saveSync(db);
+    if (ok) { pendingSave = false; retryCount = 0; }
+    return ok;
+  }
+
+  function hasUnsavedChanges() { return pendingSave || saveInFlight; }
   function lastSaveError() { return saveError; }
+
+  var saveStateListeners = [];
+  function onSaveState(fn) {
+    saveStateListeners.push(fn);
+    return function () {
+      saveStateListeners = saveStateListeners.filter(function (l) { return l !== fn; });
+    };
+  }
+  function notifySaveState() {
+    saveStateListeners.forEach(function (fn) {
+      try { fn({ error: saveError, pending: pendingSave, retries: retryCount }); }
+      catch (e) { console.error(e); }
+    });
+  }
 
   /* ---- Mutation --------------------------------------------------------- */
 
@@ -91,9 +197,26 @@
    */
   function commit(label, mutator, options) {
     var opts = options || {};
+
+    // A second tab must not overwrite the tab that is actually being used.
+    if (CF.tabguard && !CF.tabguard.canWrite()) {
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('CleanFlow is open in another tab — changes here are not saved', { tone: 'bad' });
+      }
+      return db;
+    }
+
+    if (locked) {
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('Your saved data could not be read — resolve that first', { tone: 'bad' });
+      }
+      return db;
+    }
+
     if (!opts.noUndo) pushUndo(label);
 
     mutator(db);
+    invalidateDerived();
 
     if (!opts.skipActivity && opts.activity) logActivity(opts.activity);
 
@@ -113,6 +236,7 @@
     var entry = undoStack.pop();
     if (!entry) return false;
     db = JSON.parse(entry.snapshot);
+    invalidateDerived();
     schedule();
     notify();
     return entry.label || true;
@@ -120,8 +244,12 @@
 
   /** Replace the whole database — restore from backup, reset, seed demo. */
   function replace(next, label) {
+    // Restoring or resetting is the user's explicit decision to overwrite,
+    // so it is also what releases a read-failure lock.
+    locked = null;
     pushUndo(label || 'Replace data');
     db = CF.schema.migrate(next);
+    invalidateDerived();
     schedule();
     notify();
     return db;
@@ -211,6 +339,9 @@
     all: all, find: find, insert: insert, update: update,
     remove: remove, restore: restore,
     nextNumber: nextNumber, logActivity: logActivity,
-    flush: flush, lastSaveError: lastSaveError, uid: uid
+    flush: flush, flushSync: flushSync, lastSaveError: lastSaveError,
+    hasUnsavedChanges: hasUnsavedChanges, onSaveState: onSaveState,
+    isLocked: isLocked, lockInfo: lockInfo, unlock: unlock,
+    takeLoadNotice: takeLoadNotice, uid: uid
   };
 })(window.CF = window.CF || {});

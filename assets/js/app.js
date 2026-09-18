@@ -10,11 +10,17 @@
     var root = document.getElementById('app');
     if (!root) return;
 
+    if (CF.tabguard) CF.tabguard.start();
+
     CF.store.init()
       .then(function () {
         var mode = CF.storage.describe();
         CF.shell.mount(root);
         CF.shell.repaint();
+
+        var notice = CF.store.takeLoadNotice();
+        if (notice) setTimeout(function () { CF.ui.toast(notice, { duration: 7000 }); }, 900);
+        if (CF.store.isLocked()) return;
 
         if (mode.mode === 'memory') {
           setTimeout(function () {

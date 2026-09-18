@@ -69,6 +69,20 @@ is the only safety net you have.**
 CleanFlow reminds you when it's been a while. Take the reminder seriously — keep
 a backup in your cloud drive or emailed to yourself.
 
+**Before a restore replaces anything**, CleanFlow downloads a safety copy of what
+you currently have, shows you what's inside the file you picked, and asks you to
+confirm. If a file isn't a genuine CleanFlow backup, it's refused rather than
+imported as junk.
+
+**If CleanFlow ever can't read your saved data**, it stops and says so instead of
+starting empty — because an empty database that saves itself over your real one
+is how data actually gets lost. You'll be offered *Try Again*, *Restore from a
+backup*, or *Start over*, and nothing is written until you choose.
+
+**Only one tab at a time saves.** If you open CleanFlow twice, the second tab goes
+read-only with a banner and a *Use This Tab* button, so two copies can't overwrite
+each other's work.
+
 **Clearing your browser's site data will erase CleanFlow.** So will
 "Clear browsing data → Cookies and site data". Back up first.
 

@@ -325,6 +325,17 @@
   font-weight: 700; font-size: 13px; cursor: pointer;
 }
 
+/* Data-safety bars. Same shape as the demo banner so the chrome stays
+   consistent; colour carries the severity. */
+.safety-bar {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--s-3); padding: 9px var(--s-4);
+  font-size: 13px; font-weight: 600; flex-wrap: wrap;
+  color: #fff; text-align: center;
+}
+.safety-bar--warn { background: var(--warn-dark); }
+.safety-bar--bad  { background: var(--bad-text); }
+
 .demo-banner {
   background: var(--ink); color: #fff;
   display: flex; align-items: center; justify-content: center;
