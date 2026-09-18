@@ -1,0 +1,173 @@
+/* ==========================================================================
+   CleanFlow — Screen-specific layout
+   Only rules that belong to one screen live here. Anything reused twice
+   belongs in components.css.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Onboarding
+   -------------------------------------------------------------------------- */
+.onboard {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 20% 20%, var(--brand-tint) 0%, var(--page) 55%);
+  padding: var(--s-6);
+}
+.onboard__card {
+  width: 100%; max-width: 520px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-4xl);
+  box-shadow: var(--shadow-lg); padding: var(--s-10);
+}
+@media (max-width: 560px) { .onboard__card { padding: var(--s-6); } }
+
+.onboard__steps { display: flex; gap: var(--s-2); margin-bottom: var(--s-7); }
+.onboard__step  { flex: 1; height: 4px; border-radius: 4px; background: var(--border);
+                  transition: background var(--dur) var(--ease); }
+.onboard__step.is-done { background: var(--brand); }
+
+.onboard__eyebrow {
+  font-size: 13px; font-weight: 700; color: var(--brand);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.onboard__title { font-size: var(--t-2xl); font-weight: 800; margin-top: 6px;
+                  letter-spacing: -0.02em; line-height: 1.2; }
+.onboard__sub   { font-size: 14px; color: var(--text-muted); margin-top: 6px; }
+
+/* --------------------------------------------------------------------------
+   Home — the Next Job hero
+   -------------------------------------------------------------------------- */
+.nextjob {
+  display: flex; align-items: center; gap: var(--s-5);
+  background: var(--ink); border-radius: var(--r-3xl);
+  padding: var(--s-5) var(--s-6); width: 100%;
+  border: none; cursor: pointer; text-align: left; font: inherit;
+  color: var(--ink-text);
+}
+.nextjob__when {
+  font-size: 12px; font-weight: 700; color: var(--brand-on-dark);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  width: 78px; flex-shrink: 0; line-height: 1.4;
+}
+.nextjob__rule { width: 1px; height: 34px; background: var(--ink-rule); flex-shrink: 0; }
+.nextjob__client { font-size: var(--t-lg); font-weight: 800; }
+.nextjob__meta   { font-size: 13px; color: var(--ink-muted); margin-top: 2px; }
+@media (max-width: 560px) {
+  .nextjob { flex-wrap: wrap; gap: var(--s-3); }
+  .nextjob__rule { display: none; }
+  .nextjob .btn { width: 100%; }
+}
+
+.attention__row {
+  display: flex; align-items: center; gap: var(--s-4);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-xl); padding: var(--s-4) var(--s-5);
+}
+@media (max-width: 560px) {
+  .attention__row { flex-wrap: wrap; }
+  .attention__row .btn { width: 100%; }
+}
+
+.activity__item { display: flex; gap: var(--s-3); align-items: flex-start; }
+.activity__text { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+
+/* --------------------------------------------------------------------------
+   Smart Quote
+   -------------------------------------------------------------------------- */
+.quote__form {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-2xl); padding: var(--s-6);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.quote__panel { position: sticky; top: calc(var(--nav-h) + var(--s-5)); }
+@media (max-width: 860px) { .quote__panel { position: static; } }
+
+.quote__eyebrow {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--brand-on-dark); text-transform: uppercase;
+}
+.quote__basis { font-size: 12px; color: var(--ink-faint); margin-top: var(--s-1); }
+
+.quote__price {
+  font-size: var(--t-hero); font-weight: 800; margin-top: var(--s-2);
+  letter-spacing: -0.02em; line-height: 1.05;
+  background: none; border: none; color: #fff; cursor: pointer;
+  font-family: var(--font); padding: 0;
+}
+.quote__price-edit {
+  font-size: 13px; font-weight: 600; color: var(--brand-on-dark);
+  vertical-align: middle; margin-left: var(--s-2);
+}
+.quote__price-input {
+  width: 170px; font-size: var(--t-hero); font-weight: 800;
+  letter-spacing: -0.02em; background: transparent; border: none;
+  border-bottom: 2px solid var(--brand); color: #fff;
+  text-align: left; outline: none; font-family: var(--font);
+  padding: 0; -moz-appearance: textfield;
+}
+.quote__price-input::-webkit-outer-spin-button,
+.quote__price-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.quote__calc {
+  text-align: left; background: var(--ink-fill); border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4); margin-top: var(--s-3);
+  font-size: var(--t-sm); color: var(--ink-body);
+  display: flex; flex-direction: column; gap: var(--s-1);
+}
+.quote__calc-row { display: flex; justify-content: space-between; gap: var(--s-4); }
+.quote__calc-row--total {
+  border-top: 1px solid var(--ink-rule-soft); margin-top: var(--s-1);
+  padding-top: var(--s-2); color: #fff; font-weight: 700;
+}
+
+.quote__figures {
+  display: flex; justify-content: center; gap: var(--s-7);
+  margin-top: var(--s-5); padding-top: var(--s-4);
+  border-top: 1px solid var(--ink-rule-soft);
+}
+.quote__fig-label { font-size: 12px; color: var(--ink-muted-2); }
+.quote__fig-value { font-size: var(--t-lg); font-weight: 700; margin-top: var(--s-1); }
+.quote__fig-value--ok { color: var(--ok-bright); }
+.quote__fig-value--thin { color: var(--warn-dot); }
+
+/* --------------------------------------------------------------------------
+   Grow
+   -------------------------------------------------------------------------- */
+.opp { background: var(--surface); border: 1px solid var(--border);
+       border-radius: var(--r-2xl); padding: var(--s-5); }
+.opp__title { font-size: 15px; font-weight: 800; }
+.opp__revenue { font-size: 13px; color: var(--text-muted); margin-top: var(--s-2); }
+.opp__revenue b { color: var(--ok-text); font-weight: 800; }
+.opp__why { font-size: var(--t-sm); color: var(--text-faint);
+            margin-top: 6px; line-height: 1.5; }
+.opp__item { padding: var(--s-3); background: var(--surface-sunken);
+             border-radius: var(--r-md); }
+.opp__item-label { font-size: 13px; color: var(--text-2); }
+.opp__done { font-size: var(--t-xs); color: var(--ok-text);
+             font-weight: 700; margin-top: 6px; }
+
+/* --------------------------------------------------------------------------
+   Printable documents (invoice, quote, proposal)
+   -------------------------------------------------------------------------- */
+.doc__head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--s-4); padding-bottom: var(--s-5);
+  border-bottom: 2px solid var(--ink);
+}
+.doc__biz  { font-weight: 800; font-size: var(--t-lg); }
+.doc__ref  { font-size: 12px; color: var(--text-faint); }
+.doc__block { margin-top: var(--s-5); }
+.doc__label { font-size: 12px; font-weight: 700; color: var(--text-faint);
+              text-transform: uppercase; letter-spacing: 0.04em; }
+.doc__value { font-size: 16px; font-weight: 700; margin-top: var(--s-1); }
+.doc__body  { font-size: var(--t-base); color: var(--text-2); line-height: 1.7;
+              margin-top: var(--s-2); }
+.doc__total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: var(--s-5); padding-top: var(--s-4);
+  border-top: 1px solid var(--border-soft);
+}
+.doc__terms { font-size: 12px; color: var(--text-faint); margin-top: var(--s-4); }
+
+.lineitem { display: flex; justify-content: space-between; gap: var(--s-4);
+            font-size: 14px; }
+.lineitem__name { color: var(--text-muted); }
+.lineitem__amt  { font-weight: 700; }

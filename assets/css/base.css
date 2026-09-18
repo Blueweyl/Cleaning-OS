@@ -1,0 +1,182 @@
+/* ==========================================================================
+   CleanFlow — Reset, typography, layout primitives, utilities
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--page);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { color: var(--brand-hover); }
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Visible focus everywhere. Never remove this without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-dashed); border-radius: var(--r-sm); }
+
+/* --------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+@keyframes cf-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cf-pop {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes cf-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes cf-slide-left {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes cf-spin { to { transform: rotate(360deg); } }
+
+.anim-fade-up   { animation: cf-fade-up var(--dur-slow) var(--ease); }
+.anim-pop       { animation: cf-pop var(--dur) var(--ease); }
+.anim-slide-up  { animation: cf-slide-up var(--dur) var(--ease); }
+.anim-slide-left{ animation: cf-slide-left var(--dur) var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Typography roles
+   -------------------------------------------------------------------------- */
+.h-page    { font-size: var(--t-2xl); font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.h-hello   { font-size: var(--t-3xl); font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.h-section { font-size: var(--t-lg); font-weight: 800; letter-spacing: -0.01em; }
+.h-card    { font-size: var(--t-xl); font-weight: 800; letter-spacing: -0.02em; }
+
+.sub       { font-size: 15px; color: var(--text-muted); margin-top: var(--s-1); }
+.meta      { font-size: var(--t-sm); color: var(--text-faint); }
+.eyebrow   { font-size: var(--t-sm); font-weight: 700; color: var(--text-faint);
+             text-transform: uppercase; letter-spacing: 0.04em; }
+
+.num       { font-variant-numeric: tabular-nums; }
+
+.muted     { color: var(--text-muted); }
+.faint     { color: var(--text-faint); }
+
+/* --------------------------------------------------------------------------
+   Layout
+   -------------------------------------------------------------------------- */
+.app       { min-height: 100vh; display: flex; flex-direction: column; }
+
+.page {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--s-8) var(--s-7) var(--s-16);
+}
+.page--narrow { max-width: 640px; }
+.page--form   { max-width: 520px; }
+
+.stack   { display: flex; flex-direction: column; }
+.stack-1 { gap: var(--s-1); } .stack-2 { gap: var(--s-2); }
+.stack-3 { gap: var(--s-3); } .stack-4 { gap: var(--s-4); }
+.stack-5 { gap: var(--s-5); } .stack-6 { gap: var(--s-6); }
+
+.row     { display: flex; align-items: center; }
+.row-2   { gap: var(--s-2); } .row-3 { gap: var(--s-3); }
+.row-4   { gap: var(--s-4); } .row-5 { gap: var(--s-5); }
+.row-wrap{ flex-wrap: wrap; }
+.between { justify-content: space-between; }
+.grow    { flex: 1; min-width: 0; }
+.shrink0 { flex-shrink: 0; }
+
+.grid    { display: grid; gap: var(--s-3); }
+.grid-2  { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3  { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4  { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-split { grid-template-columns: 1.3fr 1fr; gap: var(--s-6); }
+.grid-calc  { grid-template-columns: 1fr 1fr; gap: var(--s-6); align-items: start; }
+
+.mt-2 { margin-top: var(--s-2); } .mt-3 { margin-top: var(--s-3); }
+.mt-4 { margin-top: var(--s-4); } .mt-5 { margin-top: var(--s-5); }
+.mt-6 { margin-top: var(--s-6); } .mt-8 { margin-top: var(--s-8); }
+.mb-3 { margin-bottom: var(--s-3); } .mb-4 { margin-bottom: var(--s-4); }
+.mb-5 { margin-bottom: var(--s-5); } .mb-6 { margin-bottom: var(--s-6); }
+
+.center     { text-align: center; }
+.right      { text-align: right; }
+.scroll-x   { overflow-x: auto; -webkit-overflow-scrolling: touch;
+              scrollbar-width: none; }
+.scroll-x::-webkit-scrollbar { display: none; }
+.nowrap     { white-space: nowrap; }
+.truncate   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: absolute; left: var(--s-2); top: -60px; z-index: 200;
+  background: var(--brand); color: #fff; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md); font-weight: 700; transition: top var(--dur) var(--ease);
+}
+.skip-link:focus { top: var(--s-2); color: #fff; }
+
+/* --------------------------------------------------------------------------
+   Responsive — phone first in behaviour, desktop enhanced
+   -------------------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .page { padding: var(--s-5) var(--s-4) calc(var(--s-16) + var(--s-8)); }
+  .desktop-only { display: none !important; }
+  .grid-2, .grid-3, .grid-split, .grid-calc { grid-template-columns: 1fr !important; }
+  /* Four small stat tiles still scan fine two-up on a phone. */
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .h-hello { font-size: var(--t-2xl); }
+  .h-page  { font-size: var(--t-xl); }
+}
+@media (min-width: 861px) {
+  .mobile-only { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Print — invoices, quotes and proposals must print cleanly
+   -------------------------------------------------------------------------- */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  .page { padding: 0; max-width: none; }
+  .card, .paper { border: none !important; box-shadow: none !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }

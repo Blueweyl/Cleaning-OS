@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="CleanFlow — the complete operating system for a solo cleaning business. Clients, quotes, jobs, invoices and follow-ups, all on your own device.">
+<meta name="theme-color" content="#3E6FD9">
+<title>CleanFlow — Cleaning Business OS</title>
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%233E6FD9'/><text x='16' y='23' font-family='system-ui,sans-serif' font-size='19' font-weight='800' fill='white' text-anchor='middle'>C</text></svg>">
+
+<!-- Plus Jakarta Sans when online; the fallback stack in tokens.css keeps
+     an offline copy looking composed rather than broken. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/views.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div id="app">
+  <div class="loading" style="min-height:60vh">
+    <div class="spinner" aria-hidden="true"></div>
+    <span>Opening CleanFlow…</span>
+  </div>
+</div>
+
+<noscript>
+  <div style="max-width:520px;margin:80px auto;padding:32px;font-family:system-ui,sans-serif;
+              background:#fff;border:1px solid #E9EBEF;border-radius:18px;">
+    <h1 style="font-size:20px;margin:0 0 8px;">JavaScript is switched off</h1>
+    <p style="color:#64748B;line-height:1.6;margin:0;">
+      CleanFlow runs entirely in your browser, so it needs JavaScript enabled.
+      Turn it on and reload this page.
+    </p>
+  </div>
+</noscript>
+
+<!-- Classic scripts, no modules: this file has to work when it is opened
+     straight from a folder (file://), where ES modules are blocked. -->
+<script src="assets/js/core/dom.js"></script>
+<script src="assets/js/core/format.js"></script>
+<script src="assets/js/core/storage.js"></script>
+<script src="assets/js/core/router.js"></script>
+<script src="assets/js/data/schema.js"></script>
+<script src="assets/js/core/store.js"></script>
+<script src="assets/js/features/queries.js"></script>
+<script src="assets/js/features/pricing.js"></script>
+<script src="assets/js/features/actions.js"></script>
+<script src="assets/js/features/backup.js"></script>
+<script src="assets/js/data/demo.js"></script>
+<script src="assets/js/ui/overlays.js"></script>
+<script src="assets/js/ui/controls.js"></script>
+<script src="assets/js/views/onboarding.js"></script>
+<script src="assets/js/views/home.js"></script>
+<script src="assets/js/views/clients.js"></script>
+<script src="assets/js/views/jobs.js"></script>
+<script src="assets/js/views/money.js"></script>
+<script src="assets/js/views/quote.js"></script>
+<script src="assets/js/views/grow.js"></script>
+<script src="assets/js/views/settings.js"></script>
+<script src="assets/js/ui/shell.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/* ==========================================================================
+   CleanFlow — Design Tokens
+   Every color, space, radius and type step in the product is defined here.
+   Change a value here and it changes everywhere. Never hard-code a hex
+   value in a component file.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand ---------------------------------------------------------- */
+  --brand:            #3E6FD9;
+  --brand-hover:      #2E5BC0;
+  --brand-active:     #2850AB;
+  --brand-tint:       #EEF3FC;  /* chips, active nav, avatars          */
+  --brand-tint-2:     #F5F8FE;  /* selected rows, info panels          */
+  --brand-border:     #DCE6FA;
+  --brand-on-dark:    #8FA6D9;  /* brand text on the ink surface       */
+
+  /* ---- Ink (dark surface used for hero cards + toasts) ---------------- */
+  --ink:              #1B2430;
+  --ink-text:         #FFFFFF;
+  --ink-muted:        #9AA7BC;
+  --ink-muted-2:      #8B96A8;
+  --ink-faint:        #6B7C9C;
+  --ink-body:         #C7D2E8;
+  --ink-rule:         rgba(255, 255, 255, 0.12);
+  --ink-rule-soft:    rgba(255, 255, 255, 0.10);
+  --ink-fill:         rgba(255, 255, 255, 0.06);
+  --ink-stroke:       rgba(255, 255, 255, 0.20);
+
+  /* ---- Neutrals ------------------------------------------------------- */
+  --text:             #1B2430;  /* primary copy                        */
+  --text-2:           #334155;  /* secondary copy                      */
+  --text-3:           #475569;  /* field labels                        */
+  --text-muted:       #64748B;  /* supporting copy                     */
+  --text-faint:       #94A3B8;  /* meta, timestamps, placeholders      */
+
+  --surface:          #FFFFFF;
+  --surface-sunken:   #FAFBFD;  /* inputs, secondary buttons           */
+  --page:             #F6F7F9;
+  --chip:             #F5F6F8;  /* unselected segmented control        */
+  --chip-alt:         #F1F2F4;
+
+  --border:           #E9EBEF;  /* card borders                        */
+  --border-strong:    #E1E5EB;  /* input + button borders              */
+  --border-soft:      #F0F1F4;  /* internal rules                      */
+  --border-softer:    #F5F6F8;  /* list dividers                       */
+  --border-dashed:    #D8DEE7;  /* empty-state outlines                */
+
+  /* ---- Semantic: success --------------------------------------------- */
+  --ok-bg:            #F0F9F1;
+  --ok-border:        #D8EEDA;
+  --ok-text:          #237A42;
+  --ok-mid:           #2F8F52;
+  --ok-soft:          #5C9E76;
+  --ok-bright:        #6FCF97;  /* profit figures on the ink surface   */
+  --ok-dot:           #3E9E64;
+
+  /* ---- Semantic: warning --------------------------------------------- */
+  --warn-bg:          #FFF8ED;
+  --warn-border:      #F3E4C3;
+  --warn-text:        #B8790C;
+  --warn-dark:        #966008;
+  --warn-deep:        #7A5A16;
+  --warn-dot:         #E0B23C;
+  --warn-dot-hot:     #E08A3C;
+
+  /* ---- Semantic: danger ---------------------------------------------- */
+  --bad-bg:           #FDF3F2;
+  --bad-text:         #C0453F;
+  --bad-dot:          #E0524C;
+
+  /* ---- Spacing scale (4px base) --------------------------------------- */
+  --s-1:  4px;   --s-2:  8px;   --s-3:  12px;  --s-4:  16px;
+  --s-5:  20px;  --s-6:  24px;  --s-7:  28px;  --s-8:  32px;
+  --s-10: 40px;  --s-12: 48px;  --s-14: 56px;  --s-16: 64px;
+
+  /* ---- Radius --------------------------------------------------------- */
+  --r-sm:   8px;
+  --r-md:   10px;
+  --r-lg:   12px;
+  --r-xl:   14px;
+  --r-2xl:  16px;
+  --r-3xl:  18px;
+  --r-4xl:  24px;
+  --r-pill: 999px;
+
+  /* ---- Type scale ----------------------------------------------------- */
+  --t-xs:   11.5px;
+  --t-sm:   12.5px;
+  --t-base: 13.5px;
+  --t-md:   14.5px;
+  --t-lg:   17px;
+  --t-xl:   20px;
+  --t-2xl:  24px;
+  --t-3xl:  26px;
+  --t-hero: 56px;
+
+  /* ---- Elevation ------------------------------------------------------ */
+  --shadow-sm:    0 1px 2px rgba(20, 30, 50, 0.04);
+  --shadow-md:    0 12px 40px -20px rgba(20, 30, 50, 0.15);
+  --shadow-lg:    0 20px 60px -20px rgba(20, 30, 50, 0.15);
+  --shadow-modal: 0 24px 60px -20px rgba(20, 30, 50, 0.35);
+  --shadow-brand: 0 8px 20px -6px rgba(62, 111, 217, 0.5);
+  --shadow-toast: 0 12px 30px -10px rgba(0, 0, 0, 0.4);
+  --scrim:        rgba(20, 30, 50, 0.4);
+  --scrim-strong: rgba(20, 30, 50, 0.45);
+
+  /* ---- Motion --------------------------------------------------------- */
+  --ease:      cubic-bezier(0.2, 0, 0.2, 1);
+  --dur-fast:  120ms;
+  --dur:       200ms;
+  --dur-slow:  350ms;
+
+  /* ---- Layout --------------------------------------------------------- */
+  --page-max:   1180px;
+  --nav-h:      64px;
+  --tap:        44px;   /* minimum touch target */
+
+  /* ---- Type family ----------------------------------------------------
+     Plus Jakarta Sans is loaded from Google Fonts when online. The fallback
+     stack is deliberately close in metrics so an offline download still
+     looks composed rather than broken.                                    */
+  --font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system,
+          'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
