@@ -17,7 +17,10 @@
   /** $1,450 — no cents unless the amount actually has them. */
   function money(amount, opts) {
     var s = settings();
-    var value = Number(amount) || 0;
+    // A stray Infinity (a divide-by-zero upstream) must not reach the screen
+    // as "$∞" on something a client is looking at.
+    var value = Number(amount);
+    if (!isFinite(value)) value = 0;
     var symbol = s.currencySymbol || '$';
     var showCents = opts && opts.cents !== undefined
       ? opts.cents

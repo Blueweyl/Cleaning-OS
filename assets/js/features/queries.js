@@ -176,6 +176,18 @@
   }
 
   /**
+   * Anything received beyond the invoice total. `invoiceRemaining` floors at
+   * zero — which is right for "what is still owed" but means an overpayment
+   * would otherwise vanish, leaving a Received figure larger than the total
+   * and nothing on screen to explain it.
+   */
+  function invoiceOverpaid(inv) {
+    if (!inv) return 0;
+    var over = invoiceReceived(inv) - (Number(inv.total) || 0);
+    return over > 0.005 ? Math.round(over * 100) / 100 : 0;
+  }
+
+  /**
    * Status is always derived, never stored — so it cannot go stale while
    * the app sits closed over a weekend.
    */
@@ -209,7 +221,9 @@
   }
 
   function outstandingTotal() {
-    return openInvoices().reduce(function (a, i) { return a + invoiceRemaining(i); }, 0);
+    return Math.round(openInvoices().reduce(function (a, i) {
+      return a + invoiceRemaining(i);
+    }, 0) * 100) / 100;
   }
 
   /* ---- Quotes ------------------------------------------------------------ */
@@ -263,7 +277,12 @@
           out.push({
             id: p.id, date: p.date, amount: Number(p.amount) || 0,
             method: p.method, invoiceId: inv.id,
-            invoiceNumber: inv.number, clientId: inv.clientId
+            invoiceNumber: inv.number,
+            clientId: inv.clientId,
+            // Jobs booked by name only have no clientId; without this the
+            // payment reads "Unknown client" in the ledger and the CSV.
+            clientName: inv.clientName || '',
+            taxShare: paymentTaxShare(inv, p)
           });
         }
       });
@@ -271,8 +290,31 @@
     return out.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   }
 
+  /**
+   * How much of one payment is tax the owner is holding for the tax office.
+   * Apportioned by the invoice's own tax share, so a part payment carries a
+   * proportionate part of the tax.
+   */
+  function paymentTaxShare(inv, payment) {
+    var tax = Number(inv && inv.tax) || 0;
+    var total = Number(inv && inv.total) || 0;
+    var amount = Number(payment && payment.amount) || 0;
+    if (tax <= 0 || total <= 0) return 0;
+    return Math.round(amount * (tax / total) * 100) / 100;
+  }
+
+  function cents(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
   function summary(from, to) {
-    var revenue = paymentsIn(from, to).reduce(function (a, p) { return a + p.amount; }, 0);
+    var pays = paymentsIn(from, to);
+    var collected = pays.reduce(function (a, p) { return a + p.amount; }, 0);
+
+    // Sales tax passes through the business; it was never income. Counting it
+    // as revenue overstates profit by the entire tax bill, which is exactly
+    // the number a solo owner is trying to plan around.
+    var taxCollected = pays.reduce(function (a, p) { return a + (p.taxShare || 0); }, 0);
+    var revenue = cents(collected - taxCollected);
+
     var spend = expenses().filter(function (e) { return inRange(e.date, from, to); })
       .reduce(function (a, e) { return a + (Number(e.amount) || 0); }, 0);
 
@@ -280,11 +322,15 @@
       return j.status === 'completed' && inRange(j.completedDate || j.date, from, to);
     });
 
+    var profit = cents(revenue - spend);
+
     return {
+      collected: cents(collected),
+      taxCollected: cents(taxCollected),
       revenue: revenue,
-      expenses: spend,
-      profit: revenue - spend,
-      margin: revenue > 0 ? Math.round(((revenue - spend) / revenue) * 100) : 0,
+      expenses: cents(spend),
+      profit: profit,
+      margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0,
       outstanding: outstandingTotal(),
       jobsCompleted: jobsDone.length,
       averageJob: jobsDone.length
@@ -524,6 +570,7 @@
     jobsForClient: jobsForClient, jobTotal: jobTotal, checklistProgress: checklistProgress,
     sortByWhen: sortByWhen,
     invoices: invoices, invoiceReceived: invoiceReceived, invoiceRemaining: invoiceRemaining,
+    invoiceOverpaid: invoiceOverpaid,
     invoiceStatus: invoiceStatus, openInvoices: openInvoices, overdueInvoices: overdueInvoices,
     outstandingTotal: outstandingTotal,
     quotes: quotes, quotesByStatus: quotesByStatus, staleQuotes: staleQuotes,

@@ -19,6 +19,25 @@
 
   function settings() { return CF.store.get().settings; }
 
+  /**
+   * Tax on an amount, in whole cents.
+   *
+   * The rate is clamped: a mistyped "-8.25" in Settings would otherwise turn
+   * every invoice into a silent discount, and nothing in the UI would say so.
+   */
+  function taxRate() {
+    var r = Number(settings().taxRate);
+    if (!isFinite(r) || r <= 0) return 0;
+    return Math.min(r, 100);
+  }
+
+  function taxOn(amount) {
+    if (!settings().taxEnabled) return 0;
+    var base = Number(amount);
+    if (!isFinite(base)) return 0;
+    return Math.round(base * taxRate()) / 100;
+  }
+
   function round(value) {
     var step = settings().roundTo || 5;
     if (step <= 1) return Math.round(value);
@@ -92,8 +111,7 @@
     var profit = price - cost;
     var margin = price > 0 ? Math.round((profit / price) * 100) : 0;
 
-    var tax = s.taxEnabled ? Math.round(price * (Number(s.taxRate) || 0) ) / 100 : 0;
-    if (s.taxEnabled) tax = Math.round(price * (Number(s.taxRate) || 0) / 100 * 100) / 100;
+    var tax = taxOn(price);
 
     return {
       serviceName: svc.name,
@@ -114,7 +132,7 @@
       profit: profit,
       margin: margin,
       tax: tax,
-      total: price + tax,
+      total: Math.round((price + tax) * 100) / 100,
       hourlyRate: minutes > 0 ? Math.round((price / (minutes / 60))) : 0
     };
   }
@@ -148,6 +166,7 @@
   CF.pricing = {
     calculate: calculate,
     marginVerdict: marginVerdict,
+    taxOn: taxOn, taxRate: taxRate,
     lineItems: lineItems,
     SIZE_BASELINE: SIZE_BASELINE
   };

@@ -271,6 +271,11 @@
 
         priceNode,
 
+        // The owner quotes a pre-tax figure but bills the total; say so here so
+        // the two numbers are never a surprise to either side.
+        c.tax > 0 ? el('div.quote__basis', { style: { marginTop: '2px' } },
+          '+ ' + F.money(c.tax) + ' ' + taxWord() + ' · client pays ' + F.money(c.total)) : null,
+
         el('div', { style: { marginTop: '4px' } }, [
           el('button.linkbtn.linkbtn--on-ink', {
             type: 'button',
@@ -364,7 +369,8 @@
         condition: draft.condition, addonIds: draft.addonIds.slice(),
         frequency: draft.frequency,
         price: c.price, cost: c.cost, profit: c.profit,
-        margin: c.margin, minutes: c.minutes
+        margin: c.margin, minutes: c.minutes,
+        tax: c.tax, total: c.total
       };
     }
 
@@ -437,7 +443,16 @@
             el('div.meta', 'Frequency'),
             el('div', { style: { fontWeight: '700' } }, frequencyLabel(quote.frequency))
           ]),
-          el('div.h-card', F.money(quote.price))
+          // Tax is re-derived from the current rate, not read back from the
+          // quote: the client must see the number they will actually be
+          // invoiced, and the invoice is raised at the rate in force then.
+          quoteTax(quote) > 0
+            ? el('div.right', [
+                el('div.meta', F.money(quote.price) + ' + ' +
+                  F.money(quoteTax(quote)) + ' ' + taxWord()),
+                el('div.h-card', F.money(quote.price + quoteTax(quote)))
+              ])
+            : el('div.h-card', F.money(quote.price))
         ]),
 
         el('div.card.card--tight.mt-4.no-print', { style: { background: 'var(--surface-sunken)' } }, [
@@ -507,6 +522,10 @@
         'Here\'s your quote for ' + Q.serviceName(quote.serviceId).toLowerCase() + ':',
         '',
         Q.serviceName(quote.serviceId) + ' — ' + F.money(quote.price),
+        quoteTax(quote) > 0
+          ? 'Plus ' + taxWord() + ' ' + F.money(quoteTax(quote)) +
+            ' — total ' + F.money(quote.price + quoteTax(quote))
+          : null,
         Number(quote.sqft).toLocaleString() + ' sq ft · ' +
           F.plural(quote.beds, 'bed') + ' · ' + F.plural(quote.baths, 'bath'),
         'Frequency: ' + frequencyLabel(quote.frequency),
@@ -516,6 +535,15 @@
       ];
       CF.ui.copy(lines.filter(function (l) { return l !== null; }).join('\n'), 'Quote');
     }
+  }
+
+  /** What this quote's tax comes to at today's rate — 0 when tax is off. */
+  function quoteTax(quote) {
+    return CF.pricing.taxOn(Number(quote.price) || 0);
+  }
+
+  function taxWord() {
+    return CF.store.get().settings.taxLabel || 'Tax';
   }
 
   function frequencyLabel(id) {

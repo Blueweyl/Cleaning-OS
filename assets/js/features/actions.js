@@ -148,6 +148,11 @@
   /**
    * Finish the clean: stamp the job, raise the invoice, and roll the
    * recurring schedule forward so the next visit is already on the books.
+   *
+   * All three happen inside one transaction, so Undo takes back the whole
+   * thing. Grouped this way because they are one decision to the user: undoing
+   * only the last step would leave the job completed and the invoice raised
+   * while quietly deleting the next booking.
    */
   function completeJob(jobId) {
     var job = S().find('jobs', jobId);
@@ -157,24 +162,27 @@
     var invoice = null;
     var nextJob = null;
 
-    S().commit('Complete job', function () {
-      CF.store.update('jobs', jobId, {
+    var done = S().transaction('Complete job', function () {
+      S().update('jobs', jobId, {
         status: 'completed',
         finishedAt: new Date().toISOString(),
         startedAt: null,
         elapsedSeconds: seconds,
         completedDate: F().today()
       }, 'Complete job');
-    }, { noUndo: true });
 
-    invoice = createInvoiceForJob(jobId);
-    nextJob = rollRecurring(jobId);
+      invoice = createInvoiceForJob(jobId);
+      nextJob = rollRecurring(jobId);
 
-    S().logActivity({
-      icon: '✅',
-      text: 'Completed ' + (job.serviceName || 'job') + ' for ' +
-            CF.q.clientName(job.clientId, job.clientName)
+      S().logActivity({
+        icon: '✅',
+        text: 'Completed ' + (job.serviceName || 'job') + ' for ' +
+              CF.q.clientName(job.clientId, job.clientName)
+      });
+      return true;
     });
+
+    if (!done) return null;   // the write was refused; nothing was changed
 
     return { job: S().find('jobs', jobId), invoice: invoice, nextJob: nextJob };
   }
@@ -243,7 +251,7 @@
     }));
 
     var subtotal = lines.reduce(function (a, l) { return a + l.amount; }, 0);
-    var tax = s.taxEnabled ? Math.round(subtotal * (Number(s.taxRate) || 0)) / 100 : 0;
+    var tax = CF.pricing.taxOn(subtotal);
 
     var invoice = S().insert('invoices', {
       number: S().nextNumber('invoice'),
@@ -308,6 +316,9 @@
       serviceId: null, sqft: 1200, beds: 2, baths: 1,
       condition: 'normal', addonIds: [], frequency: 'one-time',
       price: 0, cost: 0, profit: 0, margin: 0, minutes: 0,
+      // Recorded for the audit trail. The quote screen re-derives tax from the
+      // current rate so what the client is shown is what they will be invoiced.
+      tax: 0, total: 0,
       status: 'draft',
       date: F().today(),
       sentDate: null,
@@ -333,7 +344,13 @@
   function acceptQuote(quoteId, bookingDetails) {
     var quote = S().find('quotes', quoteId);
     if (!quote) return null;
+    return S().transaction('Accept quote', function () {
+      return doAcceptQuote(quote, bookingDetails);
+    });
+  }
 
+  function doAcceptQuote(quote, bookingDetails) {
+    var quoteId = quote.id;
     var clientId = quote.clientId;
     if (!clientId) {
       var created = createClient({

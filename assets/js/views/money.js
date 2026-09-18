@@ -48,7 +48,10 @@
 
       el('div.grid.grid-3.mb-5', [
         U.stat({ label: 'Revenue', value: F.money(sum.revenue),
-                 note: F.plural(sum.jobsCompleted, 'job') + ' completed' }),
+                 note: sum.taxCollected > 0
+                   ? F.plural(sum.jobsCompleted, 'job') + ' completed · after ' +
+                     (CF.store.get().settings.taxLabel || 'tax')
+                   : F.plural(sum.jobsCompleted, 'job') + ' completed' }),
         U.stat({ tone: 'ok', label: 'Estimated Profit', value: F.money(sum.profit),
                  note: 'Revenue minus expenses — a rough guide, not accounting-grade.' }),
         U.stat({ tone: 'warn', label: 'Waiting to Collect', value: F.money(sum.outstanding),
@@ -104,7 +107,7 @@
     });
 
     var transactions = payments.map(function (p) {
-      return { icon: '💵', label: 'Payment — ' + Q.clientName(p.clientId), date: p.date,
+      return { icon: '💵', label: 'Payment — ' + Q.clientName(p.clientId, p.clientName), date: p.date,
                amount: p.amount, tone: 'in' };
     }).concat(spend.map(function (e) {
       return { icon: '🧾', label: e.category + (e.note ? ' — ' + e.note : ''), date: e.date,
@@ -152,13 +155,19 @@
       el('div.card.mt-6', [
         el('div.eyebrow.mb-3', month.label + ' summary'),
         el('div.deflist', [
-          U.defRow('Revenue collected', F.money(sum.revenue)),
+          sum.taxCollected > 0 ? U.defRow('Collected from clients', F.money(sum.collected)) : null,
+          sum.taxCollected > 0
+            ? U.defRow((CF.store.get().settings.taxLabel || 'Tax') + ' collected (not yours)',
+                       '−' + F.money(sum.taxCollected))
+            : null,
+          U.defRow('Your revenue', F.money(sum.revenue)),
           U.defRow('Expenses', F.money(sum.expenses)),
           U.defRow('Average job value', F.money(sum.averageJob)),
           U.defRow('Estimated profit', F.money(sum.profit), true),
           el('div.meta', { style: { marginTop: '4px' } },
-            sum.margin + '% margin · still waiting on ' + F.money(sum.outstanding))
-        ])
+            sum.margin + '% margin · ' + F.money(sum.outstanding) +
+            ' still to collect (all time)')
+        ].filter(Boolean))
       ])
     ]);
   }
@@ -391,6 +400,7 @@
     var st = Q.invoiceStatus(inv);
     var received = Q.invoiceReceived(inv);
     var remaining = Q.invoiceRemaining(inv);
+    var over = Q.invoiceOverpaid(inv);
 
     return el('div.anim-fade-up', { style: { maxWidth: '600px' } }, [
       el('div.no-print', [U.backLink('Back to Money', function () { go('#/money'); })]),
@@ -430,8 +440,13 @@
           inv.tax ? U.defRow(CF.store.get().settings.taxLabel || 'Tax', F.money(inv.tax)) : null,
           U.defRow('Invoice total', F.money(inv.total)),
           U.defRow('Received', F.money(received)),
-          U.defRow('Remaining', F.money(remaining), true)
+          over > 0 ? U.defRow('Overpaid', F.money(over), true) : null,
+          over > 0 ? null : U.defRow('Remaining', F.money(remaining), true)
         ].filter(Boolean)),
+
+        over > 0 ? el('div.callout.callout--warn.mt-3',
+          'This invoice has been paid ' + F.money(over) + ' more than its total. ' +
+          'Remove or correct a payment below, or refund the difference.') : null,
 
         (inv.payments || []).length ? el('div.mt-4', [
           el('div.eyebrow.mb-2', 'Payments'),

@@ -200,6 +200,10 @@
           ? el('div.callout.callout--bad.mb-3', storage.warning)
           : null,
 
+        storage.mirrorNote
+          ? el('div.callout.callout--warn.mb-3', storage.mirrorNote)
+          : null,
+
         overdue ? el('div.callout.callout--warn.mb-3',
           CF.backup.daysSinceBackup() === null
             ? 'You have never backed up. It takes one tap and one file.'
@@ -435,7 +439,19 @@
         body: function () {
           var rateField = CF.ui.field({
             label: 'Rate (%)', value: next.rate, type: 'number', inputmode: 'decimal',
-            onInput: function (v) { next.rate = Number(v) || 0; }
+            min: 0, max: 100,
+            hint: 'A percentage, e.g. 8.25 — not the amount.',
+            onInput: function (v) {
+              var n = Number(v);
+              // A stray minus sign here would quietly discount every invoice.
+              if (v !== '' && (!isFinite(n) || n < 0 || n > 100)) {
+                rateField.setError('Enter a rate between 0 and 100.');
+                next.rate = 0;
+                return;
+              }
+              rateField.setError('');
+              next.rate = isFinite(n) ? n : 0;
+            }
           });
           var labelField = CF.ui.field({
             label: 'What do you call it?', value: next.label,

@@ -264,10 +264,18 @@
       );
     } else if (kind === 'invoices') {
       csv = toCsv(
-        ['Number', 'Issued', 'Due', 'Client', 'Total', 'Received', 'Remaining', 'Status'],
+        ['Number', 'Issued', 'Due', 'Client', 'Subtotal', 'Tax', 'Total',
+         'Received', 'Remaining', 'Status'],
         CF.q.invoices().map(function (i) {
+          // Older invoices predate the stored subtotal; derive it so the
+          // column is never blank in a spreadsheet that sums it.
+          var tax = Number(i.tax) || 0;
+          var subtotal = i.subtotal === undefined || i.subtotal === null
+            ? (Number(i.total) || 0) - tax
+            : Number(i.subtotal) || 0;
           return ['#' + i.number, i.issueDate, i.dueDate,
-                  CF.q.clientName(i.clientId, i.clientName), csvNumber(i.total),
+                  CF.q.clientName(i.clientId, i.clientName),
+                  csvNumber(subtotal), csvNumber(tax), csvNumber(i.total),
                   csvNumber(CF.q.invoiceReceived(i)), csvNumber(CF.q.invoiceRemaining(i)),
                   CF.q.invoiceStatus(i).label];
         })
@@ -291,8 +299,8 @@
       csv = toCsv(
         ['Date', 'Client', 'Invoice', 'Amount', 'Method'],
         CF.q.paymentsIn().map(function (p) {
-          return [p.date, CF.q.clientName(p.clientId), '#' + p.invoiceNumber,
-                  csvNumber(p.amount), p.method];
+          return [p.date, CF.q.clientName(p.clientId, p.clientName),
+                  '#' + p.invoiceNumber, csvNumber(p.amount), p.method];
         })
       );
     } else {

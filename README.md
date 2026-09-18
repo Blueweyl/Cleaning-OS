@@ -47,7 +47,15 @@ the price to override it — it's your business.
 
 **Finishing a job does four things at once:** marks it complete, raises the
 invoice, logs it to the client's history, and — if it's a recurring job — books
-the next visit automatically.
+the next visit automatically. All four are one step, so a single **Undo** takes
+back the whole thing rather than leaving you half-finished.
+
+**If you charge tax**, turn it on in Settings → Tax and set your rate. From then
+on the quote your client sees states your price, the tax, and the total they'll
+actually pay — the same total the invoice charges. In the Money tab your
+**revenue and profit exclude the tax you've collected**, because that money was
+never yours: it's shown separately as *"Tax collected (not yours)"* so you can
+set it aside. If you don't charge tax, none of this appears.
 
 **Grow only shows real opportunities.** A client appears under "ready to rebook"
 because their actual cleaning interval has lapsed with nothing booked ahead, not

@@ -26,6 +26,7 @@
   var MAX_UNDO = 25;
   var MAX_RETRY_DELAY = 30000;
   var writeSeq = 0;   // bumped on every change, so a slow write knows it is stale
+  var txDepth = 0;    // >0 while a multi-step action is grouped into one undo
 
   /* ---- Ids ------------------------------------------------------------- */
 
@@ -224,7 +225,9 @@
       return db;
     }
 
-    if (!opts.noUndo) pushUndo(label);
+    // Inside a transaction the group's single snapshot is already banked, so
+    // a step does not get an undo entry of its own.
+    if (!opts.noUndo && txDepth === 0) pushUndo(label);
 
     mutator(db);
     invalidateDerived();
@@ -232,8 +235,45 @@
     if (!opts.skipActivity && opts.activity) logActivity(opts.activity);
 
     schedule();
-    if (!opts.silent) notify();
+    if (!opts.silent && txDepth === 0) notify();
     return db;
+  }
+
+  /**
+   * Group several steps into one undoable action.
+   *
+   *   transaction('Complete job', function () { ...update, insert, insert... });
+   *
+   * Completing a clean stamps the job, raises an invoice and books the next
+   * visit. Without this, each of those is its own undo entry, so one press of
+   * Undo takes back the *next booking* and leaves the job completed and the
+   * invoice raised — the opposite of what the button appears to offer.
+   */
+  function transaction(label, fn) {
+    if (txDepth > 0) return fn();                 // already grouped
+
+    // Bail before banking a snapshot if the write would be refused anyway.
+    if (CF.tabguard && !CF.tabguard.canWrite()) {
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('CleanFlow is open in another tab — changes here are not saved', { tone: 'bad' });
+      }
+      return null;
+    }
+    if (locked) {
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('Your saved data could not be read — resolve that first', { tone: 'bad' });
+      }
+      return null;
+    }
+
+    pushUndo(label);
+    txDepth += 1;
+    try {
+      return fn();
+    } finally {
+      txDepth -= 1;
+      notify();
+    }
   }
 
   function pushUndo(label) {
@@ -346,7 +386,7 @@
 
   CF.store = {
     init: init, get: get, subscribe: subscribe, notify: notify,
-    commit: commit, undo: undo, canUndo: canUndo, replace: replace,
+    commit: commit, transaction: transaction, undo: undo, canUndo: canUndo, replace: replace,
     all: all, find: find, insert: insert, update: update,
     remove: remove, restore: restore,
     nextNumber: nextNumber, logActivity: logActivity,

@@ -385,8 +385,13 @@
     return {
       mode: mode,
       durable: mode === 'idb' || mode === 'local',
-      mirrored: mode === 'idb',
-      label: mode === 'idb'   ? 'This device (IndexedDB, mirrored)'
+      // "mirrored" must track whether the copy is actually being kept, not
+      // merely whether this mode would normally keep one — otherwise Settings
+      // claims a close-tab backup that is no longer there.
+      mirrored: mode === 'idb' && mirrorOk,
+      label: mode === 'idb'
+             ? (mirrorOk ? 'This device (IndexedDB, mirrored)'
+                         : 'This device (IndexedDB — instant-save copy too large)')
            : mode === 'local' ? 'This device (local storage)'
            : 'Not saved — this session only',
       warning: mode === 'memory'
