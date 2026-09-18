@@ -83,6 +83,23 @@ backup*, or *Start over*, and nothing is written until you choose.
 read-only with a banner and a *Use This Tab* button, so two copies can't overwrite
 each other's work.
 
+**Damaged data is recovered, not written off.** The usual cause of corruption is a
+save that got cut off part-way — and the start of the file is still perfectly
+good. CleanFlow reads back whatever survived and offers *Recover What You Can*,
+telling you exactly how many clients, jobs and invoices it found.
+
+### Auto-Backup Folder (the one that survives everything)
+
+Settings → *Choose a Folder*. Pick a folder once — ideally one that syncs to
+Dropbox, iCloud Drive or OneDrive — and CleanFlow keeps a fresh backup in it
+automatically, one file per day.
+
+This is the only copy that survives clearing your browser data, switching
+browsers, or losing the computer. **If you set up one thing, make it this one.**
+
+Available in Chrome and Edge. In Firefox and Safari the button doesn't appear —
+there, use *Back Up Now* and save the file into a synced folder yourself.
+
 **Clearing your browser's site data will erase CleanFlow.** So will
 "Clear browsing data → Cookies and site data". Back up first.
 

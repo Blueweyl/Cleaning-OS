@@ -36,6 +36,8 @@
   var lastError = null;
   var seq = 0;
   var quarantined = null;    // key of a corrupt value we set aside
+  var mirrorOk = true;       // is the synchronous close-tab copy still fitting?
+  var mirrorBytes = 0;
 
   /* ---- Envelope ---------------------------------------------------------
      The stored value is the database plus a little provenance. Old payloads
@@ -272,9 +274,18 @@
 
     return idbWrite(payload)
       .then(function () {
-        // Mirror for crash safety. Failure here is not fatal — IndexedDB
-        // already holds the authoritative copy.
-        try { localWrite(payload); } catch (e) { /* quota: mirror skipped */ }
+        // Mirror for crash safety. Failing here is not fatal — IndexedDB holds
+        // the authoritative copy — but it does mean the close-tab safety net
+        // is gone, and the app must know so it can compensate and say so.
+        try {
+          localWrite(payload);
+          if (!mirrorOk) { mirrorOk = true; announceMirror(); }
+        } catch (e) {
+          if (mirrorOk) { mirrorOk = false; announceMirror(); }
+          // A stale mirror is worse than none: load() would prefer whichever
+          // looks newer and this one no longer is.
+          try { localStorage.removeItem(LS_KEY); } catch (e2) {}
+        }
       })
       .catch(function (err) {
         lastError = err;
@@ -299,9 +310,38 @@
   function saveSync(data) {
     if (mode === 'memory') { memory = wrap(data); return false; }
     if (!localAvailable()) return false;
-    try { localWrite(wrap(data)); return true; }
-    catch (e) { lastError = e; return false; }
+    try {
+      var payload = wrap(data);
+      localWrite(payload);
+      mirrorBytes = JSON.stringify(payload).length;
+      if (!mirrorOk) { mirrorOk = true; announceMirror(); }
+      return true;
+    } catch (e) {
+      lastError = e;
+      if (mirrorOk) { mirrorOk = false; announceMirror(); }
+      return false;
+    }
   }
+
+  /* ---- Mirror state ------------------------------------------------------
+     Above roughly 5MB the database stops fitting in localStorage. IndexedDB
+     carries on fine, but the synchronous write used when a tab is closing has
+     nowhere to go — so that protection silently disappears exactly when
+     there is most to lose. Anyone who cares gets told.                      */
+
+  var mirrorListeners = [];
+  function onMirrorChange(fn) {
+    mirrorListeners.push(fn);
+    return function () {
+      mirrorListeners = mirrorListeners.filter(function (l) { return l !== fn; });
+    };
+  }
+  function announceMirror() {
+    mirrorListeners.forEach(function (fn) {
+      try { fn(mirrorOk); } catch (e) { console.error(e); }
+    });
+  }
+  function mirrorHealthy() { return mode === 'memory' ? false : mirrorOk; }
 
   function describeWriteError(err) {
     var name = (err && err.name) || '';
@@ -354,12 +394,19 @@
           'when you close this tab. Export a backup before you leave.'
         : null,
       quarantined: quarantined,
+      mirrorOk: mirrorHealthy(),
+      mirrorNote: (mode === 'idb' && !mirrorOk)
+        ? 'Your data has outgrown the instant-save copy. CleanFlow now saves ' +
+          'after every change instead of waiting, so nothing is lost — but back ' +
+          'up regularly.'
+        : null,
       lastError: lastError ? String(lastError.message || lastError) : null
     };
   }
 
   CF.storage = {
     init: init, load: load, save: save, saveSync: saveSync,
-    destroy: destroy, describe: describe, estimate: estimate
+    destroy: destroy, describe: describe, estimate: estimate,
+    mirrorHealthy: mirrorHealthy, onMirrorChange: onMirrorChange
   };
 })(window.CF = window.CF || {});

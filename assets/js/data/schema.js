@@ -214,24 +214,35 @@
   }
 
   /** A brand-new, empty database. */
+  /**
+   * Key order matters here, because JSON.stringify follows it and a write
+   * that gets cut off loses the tail. The owner's irreplaceable records are
+   * written first; the defaults that CleanFlow can simply regenerate —
+   * services, checklists, message templates — go last, where truncation
+   * costs nothing.
+   */
   function emptyDatabase() {
     return {
       schemaVersion: SCHEMA_VERSION,
       business: defaultBusiness(),
       settings: defaultSettings(),
+
+      // Irreplaceable: written first so damage reaches it last.
+      clients: [],
+      jobs: [],
+      invoices: [],
+      quotes: [],
+      expenses: [],
+      payments: [],
+      counters: { invoice: 100, quote: 100, proposal: 100 },
+      outreach: {},
+      activity: [],
+
+      // Regenerable defaults; migrate() puts them back if they go missing.
       services: defaultServices(),
       addons: defaultAddons(),
       checklists: defaultChecklists(),
-      templates: defaultTemplates(),
-      clients: [],
-      jobs: [],
-      quotes: [],
-      invoices: [],
-      expenses: [],
-      payments: [],
-      activity: [],
-      outreach: {},
-      counters: { invoice: 100, quote: 100, proposal: 100 }
+      templates: defaultTemplates()
     };
   }
 
@@ -286,7 +297,10 @@
     out.counters.quote   = highestNumber(out.quotes,   out.counters.quote);
 
     // A restored file must never arrive with no way to quote work.
+    // A truncated file loses its tail, which is now where the regenerable
+    // defaults live — so put them back rather than opening with no services.
     if (!out.services.length)   out.services = defaultServices();
+    if (!out.addons.length)     out.addons = defaultAddons();
     if (!out.checklists.length) out.checklists = defaultChecklists();
     if (!out.templates.length)  out.templates = defaultTemplates();
 

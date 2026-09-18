@@ -19,12 +19,14 @@
   var LOCK_KEY = 'cleanflow:writer';
   var HEARTBEAT_MS = 2000;
   var STALE_MS = 6000;
+  var PROBE_MS = 1200;    // how long to wait for the current writer to answer
 
   var tabId = 'tab-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   var isWriter = true;
   var channel = null;
   var timer = null;
   var listeners = [];
+  var sawWriter = false;
 
   function now() { return Date.now(); }
 
@@ -81,17 +83,40 @@
             if (isWriter) setWriter(false);
           } else if (msg.type === 'ping' && isWriter) {
             channel.postMessage({ type: 'here', from: tabId });
+          } else if (msg.type === 'here') {
+            sawWriter = true;
           }
         };
         channel.postMessage({ type: 'ping', from: tabId });
+
+        // Waiting for the heartbeat to go stale takes ~6.5s when the writing
+        // tab is frozen rather than closed. Asking it directly answers in a
+        // fraction of that: silence means nobody is home.
+        if (!isWriter) {
+          sawWriter = false;
+          setTimeout(function () {
+            if (!isWriter && !sawWriter) takeOver(true);
+          }, PROBE_MS);
+        }
       } catch (e) { channel = null; }
     }
 
     timer = setInterval(function () {
       if (isWriter) { writeLock(); return; }
+
       // The writing tab may have been closed; take over once its lock goes stale.
       var current = readLock();
-      if (!current || (now() - (current.at || 0)) > STALE_MS) takeOver(true);
+      if (!current || (now() - (current.at || 0)) > STALE_MS) { takeOver(true); return; }
+
+      // It may also still be open but wedged. Ask, and take over if it does
+      // not answer before the next tick.
+      if (channel) {
+        sawWriter = false;
+        try { channel.postMessage({ type: 'ping', from: tabId }); } catch (e) {}
+        setTimeout(function () {
+          if (!isWriter && !sawWriter) takeOver(true);
+        }, PROBE_MS);
+      }
     }, HEARTBEAT_MS);
 
     window.addEventListener('pagehide', releaseLock);

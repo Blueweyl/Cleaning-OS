@@ -39,19 +39,23 @@
 
   /* ---- Full backup -------------------------------------------------------- */
 
-  function exportBackup(options) {
-    var opts = options || {};
-    var db = CF.store.get();
-    var payload = {
+  /** The exact bytes of a backup file — shared by download and folder copy. */
+  function serialise() {
+    return JSON.stringify({
       _format: FILE_TAG,
       _version: CF.schema.VERSION,
       _exportedAt: new Date().toISOString(),
       _app: 'CleanFlow',
-      data: db
-    };
+      data: CF.store.get()
+    }, null, 2);
+  }
+
+  function exportBackup(options) {
+    var opts = options || {};
+    var db = CF.store.get();
     var name = slug(db.business.name) + '-' +
                (opts.suffix || 'backup') + '-' + stamp() + '.json';
-    download(name, JSON.stringify(payload, null, 2), 'application/json');
+    download(name, serialise(), 'application/json');
 
     // A pre-restore safety copy is not the user's own backup habit, so it
     // must not reset the "last backed up" reminder.
@@ -326,7 +330,7 @@
   }
 
   CF.backup = {
-    exportBackup: exportBackup,
+    exportBackup: exportBackup, serialise: serialise,
     inspectFile: inspectFile,
     applyRestore: applyRestore,
     exportCsv: exportCsv,

@@ -151,11 +151,22 @@
       });
   }
 
+  var DEBOUNCE_MIRRORED = 400;
+  var DEBOUNCE_BARE = 60;
+
+  /**
+   * Batch writes so typing does not hammer the disk. When the synchronous
+   * close-tab mirror is unavailable (a large database no longer fits in
+   * localStorage) that debounce becomes the window in which work can be lost,
+   * so it collapses to almost nothing.
+   */
   function schedule() {
     pendingSave = true;
     writeSeq += 1;
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(flush, 400);
+    var wait = (CF.storage.mirrorHealthy && !CF.storage.mirrorHealthy())
+      ? DEBOUNCE_BARE : DEBOUNCE_MIRRORED;
+    saveTimer = setTimeout(flush, wait);
   }
 
   /**

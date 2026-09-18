@@ -226,6 +226,8 @@
           }, 'Restore')
         ]),
 
+        vaultSection(),
+
         el('div.field__label', 'Export a spreadsheet'),
         el('div.row.row-2.row-wrap', ['clients', 'jobs', 'invoices', 'quotes', 'expenses', 'payments']
           .map(function (kind) {
@@ -238,6 +240,87 @@
             }, CF.fmt.titleCase(kind));
           }))
       ]);
+    }
+
+    /**
+     * The one backup that outlives the browser. Hidden entirely where the
+     * File System Access API is missing, so nobody is shown a dead button.
+     */
+    function vaultSection() {
+      if (!CF.vault || !CF.vault.supported()) {
+        return el('div.callout.callout--info.mb-3',
+          '💡 Tip: keep your exported backups in a cloud-synced folder ' +
+          '(Dropbox, iCloud, OneDrive). That copy survives even if this ' +
+          'browser\'s data is cleared.');
+      }
+
+      var host = el('div.mb-3');
+      paintVault();
+      return host;
+
+      function paintVault() {
+        CF.vault.status().then(function (st) {
+          CF.dom.clear(host);
+
+          if (!st.configured) {
+            host.appendChild(el('div.callout.callout--info', [
+              el('div.callout__title', '📁 Auto-Backup Folder'),
+              el('div', { style: { fontSize: '12.5px', lineHeight: '1.6' } },
+                'Pick a folder once — ideally one that syncs to the cloud — and ' +
+                'CleanFlow keeps a fresh backup in it automatically. This is the ' +
+                'only copy that survives clearing your browser data.'),
+              el('button.btn.btn--primary.btn--block.btn--sm.mt-3', {
+                type: 'button', onclick: pick
+              }, 'Choose a Folder')
+            ]));
+            return;
+          }
+
+          var needsPermission = st.permission !== 'granted';
+          host.appendChild(el('div.callout.callout--' + (needsPermission ? 'warn' : 'ok'), [
+            el('div.callout__title', '📁 Auto-Backup Folder'),
+            el('div', { style: { fontSize: '12.5px', lineHeight: '1.6' } },
+              needsPermission
+                ? 'Saving to "' + st.folderName + '" is paused — your browser needs ' +
+                  'you to allow access again.'
+                : 'Backing up to "' + st.folderName + '"' +
+                  (st.lastWrite ? ' · last copy ' + CF.fmt.agoPhrase(CF.fmt.toKey(new Date(st.lastWrite))) : '')),
+            el('div.row.row-2.mt-3', [
+              el('button.btn.btn--primary.btn--sm', {
+                type: 'button', style: { flex: '1' },
+                onclick: function () {
+                  CF.vault.write(true).then(function () {
+                    CF.ui.toast('Saved a copy to ' + st.folderName);
+                    paintVault();
+                  }).catch(function () {
+                    CF.ui.toast('Could not write to that folder', { tone: 'bad' });
+                    paintVault();
+                  });
+                }
+              }, needsPermission ? 'Reconnect' : 'Save Now'),
+              el('button.btn.btn--secondary.btn--sm', {
+                type: 'button',
+                onclick: function () {
+                  CF.vault.forget().then(function () {
+                    CF.ui.toast('Folder backup turned off');
+                    paintVault();
+                  });
+                }
+              }, 'Turn Off')
+            ])
+          ]));
+        }).catch(function () { CF.dom.clear(host); });
+      }
+
+      function pick() {
+        CF.vault.choose().then(function () {
+          CF.ui.toast('Folder backup is on — a copy is saved there automatically');
+          paintVault();
+        }).catch(function (err) {
+          if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+          CF.ui.toast('Could not set up that folder', { tone: 'bad' });
+        });
+      }
     }
 
     function dangerZone() {

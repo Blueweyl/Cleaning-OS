@@ -37,12 +37,18 @@
       CF.store.flush();
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') { CF.store.flushSync(); CF.store.flush(); }
+      if (document.visibilityState === 'hidden') {
+        CF.store.flushSync();
+        CF.store.flush();
+        // Refresh the external copy while the app is idle, never mid-edit.
+        if (CF.vault) CF.vault.maybeWrite();
+      }
     });
 
     // A tab that loses writer status must repaint into its read-only state.
     if (CF.tabguard) CF.tabguard.onChange(function () { repaint(); });
     CF.store.onSaveState(function () { repaintBanners(); });
+    if (CF.storage.onMirrorChange) CF.storage.onMirrorChange(function () { repaintBanners(); });
 
     // Global keyboard shortcuts, skipped while typing.
     document.addEventListener('keydown', function (e) {
@@ -150,6 +156,8 @@
   function recoveryScreen() {
     var info = CF.store.lockInfo() || {};
     var corrupt = info.reason === 'corrupt';
+    // Scanning quarantine is not free — do it once per render, not per use.
+    var rescue = salvageOffer();
 
     return el('div.onboard', [
       el('div.onboard__card.anim-fade-up', [
@@ -172,8 +180,11 @@
           'overwritten by an empty one.'),
 
         el('div.stack.stack-3.mt-6', [
-          el('button.btn.btn--primary.btn--lg.btn--block', {
-            type: 'button', autofocus: true,
+          rescue,
+          // When recovery is on offer it is the recommended path, so Try Again
+          // steps down to secondary rather than competing with it.
+          el('button.btn.btn--lg.btn--block' + (rescue ? '.btn--secondary' : '.btn--primary'), {
+            type: 'button', autofocus: !rescue,
             onclick: function () { location.reload(); }
           }, 'Try Again'),
           el('button.btn.btn--secondary.btn--lg.btn--block', {
@@ -199,6 +210,56 @@
         ]) : null
       ])
     ]);
+  }
+
+  /**
+   * A cut-off write leaves most of the data intact, so offer to pull back
+   * whatever is still readable before asking the user to give up on it.
+   */
+  function salvageOffer() {
+    if (!CF.salvage) return null;
+    var keys = CF.salvage.quarantineKeys();
+    if (!keys.length) return null;
+
+    var result = null;
+    for (var i = 0; i < keys.length && !result; i++) {
+      result = CF.salvage.fromQuarantine(keys[i]);
+    }
+    if (!result) return null;
+
+    var c = result.counts;
+    var total = c.clients + c.jobs + c.invoices + c.quotes + c.expenses;
+    if (!total) return null;
+
+    return el('div', [
+      el('div.callout.callout--ok.mb-3',
+        '✓ CleanFlow can still read ' + c.clients + ' clients, ' + c.jobs + ' jobs, ' +
+        c.invoices + ' invoices, ' + c.quotes + ' quotes and ' + c.expenses +
+        ' expenses out of the damaged file.'),
+      el('button.btn.btn--primary.btn--lg.btn--block', {
+        type: 'button', autofocus: true,
+        onclick: function () { applySalvage(result); }
+      }, 'Recover What You Can')
+    ]);
+  }
+
+  function applySalvage(result) {
+    var c = result.counts;
+    CF.ui.confirm({
+      title: 'Recover the readable data?',
+      message: 'CleanFlow will restore ' + c.clients + ' clients, ' + c.jobs + ' jobs, ' +
+               c.invoices + ' invoices, ' + c.quotes + ' quotes and ' + c.expenses +
+               ' expenses. Anything the damage destroyed cannot be brought back, ' +
+               'so check your records afterwards — and export a backup straight away.',
+      confirmLabel: 'Recover'
+    }).then(function (ok) {
+      if (!ok) return;
+      CF.store.replace(result.data, 'Recover damaged data');
+      CF.store.logActivity({ icon: '🛟', text: 'Recovered data from a damaged file' });
+      CF.router.go('#/home');
+      repaint();
+      CF.ui.toast('Recovered — export a backup now', { duration: 9000 });
+    });
   }
 
   function startOverFromLock() {
@@ -268,6 +329,13 @@
           CF.backup.exportBackup();
           CF.ui.toast('Backup downloaded');
         }));
+    }
+
+    if (storage.mirrorNote) {
+      bars.push(bar('warn', '💾 ' + storage.mirrorNote, 'Back Up Now', function () {
+        CF.backup.exportBackup();
+        CF.ui.toast('Backup downloaded');
+      }));
     }
 
     var err = CF.store.lastSaveError();
@@ -555,18 +623,52 @@
           });
         });
       }).catch(function (err) {
-        CF.ui.modal({
-          size: 'sm', title: 'Couldn\'t read that file',
-          body: el('p', { style: { fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6' } },
-            String(err.message || err)),
-          actions: function (close) {
-            return [el('button.btn.btn--primary', {
-              type: 'button', onclick: function () { close(); }
-            }, 'OK')];
-          }
+        // A damaged backup is usually a truncated one. Try to read what is
+        // left before telling the user it is worthless.
+        readAsText(file).then(function (text) {
+          var rescued = CF.salvage ? CF.salvage.attempt(text) : null;
+          var total = rescued
+            ? rescued.counts.clients + rescued.counts.jobs + rescued.counts.invoices +
+              rescued.counts.quotes + rescued.counts.expenses
+            : 0;
+
+          CF.ui.modal({
+            size: 'sm',
+            title: total ? 'That file is damaged' : 'Couldn\'t read that file',
+            body: el('div.stack.stack-3', [
+              el('p', { style: { fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 } },
+                String(err.message || err)),
+              total ? el('div.callout.callout--ok',
+                'CleanFlow can still read ' + rescued.counts.clients + ' clients, ' +
+                rescued.counts.jobs + ' jobs and ' + rescued.counts.invoices +
+                ' invoices from it.') : null
+            ]),
+            actions: function (close) {
+              return [
+                el('button.btn.btn--secondary', {
+                  type: 'button', onclick: function () { close(); }
+                }, total ? 'Cancel' : 'OK'),
+                total ? el('button.btn.btn--primary', {
+                  type: 'button',
+                  onclick: function () { close(); applySalvage(rescued); }
+                }, 'Recover What You Can') : null
+              ].filter(Boolean);
+            }
+          });
         });
       });
     }
+  }
+
+  function readAsText(file) {
+    return new Promise(function (resolve) {
+      try {
+        var r = new FileReader();
+        r.onload = function () { resolve(String(r.result || '')); };
+        r.onerror = function () { resolve(''); };
+        r.readAsText(file);
+      } catch (e) { resolve(''); }
+    });
   }
 
   /* ---- Flash (one-shot data between screens) ---------------------------------- */

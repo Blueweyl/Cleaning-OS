@@ -18,6 +18,8 @@
         CF.shell.mount(root);
         CF.shell.repaint();
 
+        if (CF.vault) CF.vault.init();
+
         var notice = CF.store.takeLoadNotice();
         if (notice) setTimeout(function () { CF.ui.toast(notice, { duration: 7000 }); }, 900);
         if (CF.store.isLocked()) return;
