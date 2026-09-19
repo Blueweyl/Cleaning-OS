@@ -802,6 +802,18 @@
 
   function saveQuote(data) {
     var clean = Object.assign({}, data);
+
+    // The client can be gone by the time this saves: a quote typed before a
+    // restore lands afterwards, and the id it was typed against belongs to a
+    // business that is no longer here. bookJob already resolves its client and
+    // drops a dead id; this did not, so the quote arrived attached to nobody.
+    // The typed name is kept — it is what the quote was for — and the dangling
+    // id is dropped so nothing points at a record that does not exist.
+    if (clean.clientId && !S().find('clients', clean.clientId)) {
+      clean.clientName = clean.clientName || CF.q.clientName(clean.clientId, '');
+      clean.clientId = null;
+    }
+
     if ('sqft'  in clean) clean.sqft  = scopeFigure(clean.sqft, 1200, 200000);
     if ('beds'  in clean) clean.beds  = scopeFigure(clean.beds, 2, 30);
     if ('baths' in clean) clean.baths = scopeFigure(clean.baths, 1, 30);

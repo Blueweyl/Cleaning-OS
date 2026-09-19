@@ -195,7 +195,8 @@ warn you about. If a file isn't a genuine CleanFlow backup, it's refused rather
 than imported as junk.
 
 **An invoice that doesn't add up says so everywhere its figure appears** — on the
-Home chase list, on the job, on the client and on the invoice itself — not only on the one screen you
+Home chase list, in the Money totals and invoice list, on the job, on the client
+and on the invoice itself — not only on the one screen you
 happened to open. CleanFlow never rewrites a figure you billed; it points at the
 disagreement and leaves the decision to you.
 

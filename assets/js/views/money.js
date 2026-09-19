@@ -55,7 +55,19 @@
         U.stat({ tone: 'ok', label: 'Estimated Profit', value: F.money(sum.profit),
                  note: 'Revenue minus expenses — a rough guide, not accounting-grade.' }),
         U.stat({ tone: 'warn', label: 'Waiting to Collect', value: F.money(sum.outstanding),
-                 note: F.plural(Q.openInvoices().length, 'open invoice') })
+                 // This total sums every open invoice, so one that disagrees
+                 // with its own lines is inside the figure. It sits above all
+                 // four tabs, which is why the Money screen showed a disputed
+                 // amount as settled fact on every one of them.
+                 note: F.plural(Q.openInvoices().length, 'open invoice') +
+                   (function () {
+                     var off = Q.openInvoices().filter(function (i) {
+                       return Q.invoiceInconsistent(i);
+                     }).length;
+                     return off
+                       ? ' · ' + F.plural(off, 'invoice') + ' does not add up'
+                       : '';
+                   })() })
       ]),
 
       U.tabs({
@@ -242,7 +254,11 @@
           el('div.grow', [
             el('div.listrow__title', Q.clientName(inv.clientId, inv.clientName)),
             el('div.meta', '#' + inv.number + ' · ' + F.shortDate(inv.issueDate) +
-              (st.id === 'overdue' ? ' · ' + F.plural(st.daysLate, 'day') + ' late' : ''))
+              (st.id === 'overdue' ? ' · ' + F.plural(st.daysLate, 'day') + ' late' : '') +
+              // This row prints inv.total, which is exactly the figure an
+              // inconsistent invoice disagrees with itself about. Every other
+              // screen showing it says so; a list is no less a place to be told.
+              (Q.invoiceInconsistent(inv) ? ' · does not add up' : ''))
           ]),
           el('div.right', [
             el('div.listrow__price', F.money(inv.total)),
