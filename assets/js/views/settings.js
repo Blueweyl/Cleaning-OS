@@ -389,8 +389,10 @@
             onclick: function () { eraseEverything(close); }
           }, 'Erase everything and start over')
         ]),
-        el('p.meta.mt-2',
-          'Both of these replace all current data. Export a backup first if you might want it back.')
+        el('p.meta.mt-2', db.settings.demoMode
+          ? 'Resetting puts the sample data back and keeps anything you added yourself. ' +
+            'Erasing clears everything. Export a backup first if you might want it back.'
+          : 'Both of these replace all current data. Export a backup first if you might want it back.')
       ]);
     }
 
@@ -707,23 +709,40 @@
     }
 
     function loadDemo(closeDrawer) {
-      var hasReal = !CF.store.get().settings.demoMode &&
-                    (CF.q.activeClients().length || CF.q.jobs().length);
+      var db = CF.store.get();
+      var inDemo = !!db.settings.demoMode;
+      // Work of their own, added while the demo was loaded. Not counted by
+      // `hasReal` below, which is about replacing a real business — but it is
+      // just as much theirs, and resetting used to delete it without a word.
+      var ownCount = inDemo ? CF.demo.ownWorkCount(db) : 0;
+      var hasReal = !inDemo && (CF.q.activeClients().length || CF.q.jobs().length);
+
       CF.ui.confirm({
-        title: hasReal ? 'Replace your data with the demo?' : 'Load demo data?',
+        title: hasReal ? 'Replace your data with the demo?'
+             : ownCount ? 'Reset the sample data?'
+             : 'Load demo data?',
         message: hasReal
           ? 'This wipes your real clients, jobs and invoices and replaces them with sample data. ' +
             'Export a backup first if you want to keep any of it.'
-          : 'Loads the Sparkle & Shine sample business so you can explore every screen with real-looking data.',
-        confirmLabel: hasReal ? 'Replace Everything' : 'Load Demo',
+          : ownCount
+            ? 'The sample clients, jobs and invoices go back to how they started. The ' +
+              CF.fmt.plural(ownCount, 'record') + ' you added yourself ' +
+              (ownCount === 1 ? 'is' : 'are') + ' kept.'
+            : 'Loads the Sparkle & Shine sample business so you can explore every screen with real-looking data.',
+        confirmLabel: hasReal ? 'Replace Everything'
+                    : ownCount ? 'Reset Samples' : 'Load Demo',
         danger: hasReal
       }).then(function (ok) {
         if (!ok) return;
-        CF.demo.load().then(function () {
+        // Resetting from inside the demo keeps their own work; loading the demo
+        // over a real business is an explicit replacement they just confirmed.
+        (ownCount ? CF.demo.reset() : CF.demo.load()).then(function () {
           closeDrawer();
           CF.router.go('#/home');
           CF.shell.repaint();
-          CF.ui.toast('Demo loaded', {
+          CF.ui.toast(ownCount
+            ? 'Sample data reset — your ' + CF.fmt.plural(ownCount, 'record') + ' kept'
+            : 'Demo loaded', {
             undo: function () { CF.store.undo(); CF.shell.repaint(); }
           });
         });

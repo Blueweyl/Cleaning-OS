@@ -351,8 +351,30 @@
     return CF.store.flush();
   }
 
+  /**
+   * Put the sample data back, keeping anything the person added themselves.
+   *
+   * "Reset demo data" used to call `load`, which replaces everything. Someone
+   * who had tried the app out for real inside the demo — their own client, a
+   * real job, a payment — lost all of it to a dialog that only offered to load
+   * sample data and said nothing about theirs.
+   *
+   * Their records go in ahead of the samples so they read as the most recent.
+   * Document numbering is repaired by the schema migration `replace` runs, so
+   * a reset cannot hand out an invoice number that has already been issued.
+   */
+  function reset() {
+    var own = ownWork(CF.store.get());
+    var next = stamp(build());
+    SEEDED.forEach(function (key) {
+      next[key] = (own[key] || []).concat(next[key] || []);
+    });
+    CF.store.replace(next, 'Reset demo data');
+    return CF.store.flush();
+  }
+
   CF.demo = {
-    build: build, load: load,
+    build: build, load: load, reset: reset,
     ownWork: ownWork, ownWorkCount: ownWorkCount, SEEDED: SEEDED
   };
 })(window.CF = window.CF || {});

@@ -218,7 +218,8 @@ the instant-save copy down with it.
 **Trying it out for real doesn't cost you the work.** Add your own client or book
 a real job while the demo is loaded, then press *Start My Business* — the sample
 data goes, and what you added yourself comes with you, invoice numbering
-included. The dialog tells you which it's about to do.
+included. *Reset demo data* works the same way: the samples go back to how they
+started and your own records stay. Both dialogs tell you which it's about to do.
 
 **Damaged data is recovered, not written off.** The usual cause of corruption is a
 save that got cut off part-way — and the start of the file is still perfectly
