@@ -210,21 +210,21 @@
       U.cappedList({ rows: rows, noun: 'quote', showAll: showAll,
         onShowAll: function () { showAll = true; CF.shell.repaint(); },
         row: function (q) {
-        var st = CF.schema.QUOTE_STATUS.filter(function (s) { return s.id === q.status; })[0]
-                 || { label: q.status, tone: 'neutral' };
-        return el('button.listrow', {
-          type: 'button', onclick: function () { go('#/money/quote/' + q.id); }
-        }, [
-          el('div.grow', [
-            el('div.listrow__title', q.clientName || Q.clientName(q.clientId)),
-            el('div.meta', '#' + q.number + ' · ' + F.shortDate(q.date) +
-              (q.status === 'sent' ? ' · sent ' + F.agoPhrase(q.sentDate || q.date) : ''))
-          ]),
-          el('div.right', [
-            el('div.listrow__price', F.money(q.price)),
-            U.badge(st.label, st.tone)
-          ])
-        ]);
+          var st = CF.schema.QUOTE_STATUS.filter(function (s) { return s.id === q.status; })[0]
+                   || { label: q.status, tone: 'neutral' };
+          return el('button.listrow', {
+            type: 'button', onclick: function () { go('#/money/quote/' + q.id); }
+          }, [
+            el('div.grow', [
+              el('div.listrow__title', q.clientName || Q.clientName(q.clientId)),
+              el('div.meta', '#' + q.number + ' · ' + F.shortDate(q.date) +
+                (q.status === 'sent' ? ' · sent ' + F.agoPhrase(q.sentDate || q.date) : ''))
+            ]),
+            el('div.right', [
+              el('div.listrow__price', F.money(q.price)),
+              U.badge(st.label, st.tone)
+            ])
+          ]);
         } })
     ]);
   }
@@ -254,24 +254,24 @@
       U.cappedList({ rows: rows, noun: 'invoice', showAll: showAll,
         onShowAll: function () { showAll = true; CF.shell.repaint(); },
         row: function (inv) {
-        var st = Q.invoiceStatus(inv);
-        return el('button.listrow', {
-          type: 'button', onclick: function () { go('#/money/invoice/' + inv.id); }
-        }, [
-          el('div.grow', [
-            el('div.listrow__title', Q.clientName(inv.clientId, inv.clientName)),
-            el('div.meta', '#' + inv.number + ' · ' + F.shortDate(inv.issueDate) +
-              (st.id === 'overdue' ? ' · ' + F.plural(st.daysLate, 'day') + ' late' : '') +
-              // This row prints inv.total, which is exactly the figure an
-              // inconsistent invoice disagrees with itself about. Every other
-              // screen showing it says so; a list is no less a place to be told.
-              (Q.invoiceInconsistent(inv) ? ' · does not add up' : ''))
-          ]),
-          el('div.right', [
-            el('div.listrow__price', F.money(inv.total)),
-            U.badge(st.label, st.tone)
-          ])
-        ]);
+          var st = Q.invoiceStatus(inv);
+          return el('button.listrow', {
+            type: 'button', onclick: function () { go('#/money/invoice/' + inv.id); }
+          }, [
+            el('div.grow', [
+              el('div.listrow__title', Q.clientName(inv.clientId, inv.clientName)),
+              el('div.meta', '#' + inv.number + ' · ' + F.shortDate(inv.issueDate) +
+                (st.id === 'overdue' ? ' · ' + F.plural(st.daysLate, 'day') + ' late' : '') +
+                // This row prints inv.total, which is exactly the figure an
+                // inconsistent invoice disagrees with itself about. Every other
+                // screen showing it says so; a list is no less a place to be told.
+                (Q.invoiceInconsistent(inv) ? ' · does not add up' : ''))
+            ]),
+            el('div.right', [
+              el('div.listrow__price', F.money(inv.total)),
+              U.badge(st.label, st.tone)
+            ])
+          ]);
         } })
     ]);
   }
@@ -314,17 +314,17 @@
         ? U.cappedList({ rows: rows, noun: 'expense', showAll: showAll,
             onShowAll: function () { showAll = true; CF.shell.repaint(); },
             row: function (e) {
-            return el('div.listrow', [
-              el('div.grow', [
-                el('div.listrow__title', e.category),
-                el('div.meta', F.shortDate(e.date) + (e.note ? ' · ' + e.note : ''))
-              ]),
-              el('div.listrow__price', F.money(e.amount)),
-              el('button.iconbtn', {
-                type: 'button', 'aria-label': 'Delete expense',
-                onclick: function () { deleteExpense(e); }
-              }, '✕')
-            ]);
+              return el('div.listrow', [
+                el('div.grow', [
+                  el('div.listrow__title', e.category),
+                  el('div.meta', F.shortDate(e.date) + (e.note ? ' · ' + e.note : ''))
+                ]),
+                el('div.listrow__price', F.money(e.amount)),
+                el('button.iconbtn', {
+                  type: 'button', 'aria-label': 'Delete expense',
+                  onclick: function () { deleteExpense(e); }
+                }, '✕')
+              ]);
             } })
         : el('div.empty--soft', { style: { textAlign: 'center', padding: '36px 24px' } },
             'Log gas, supplies and other costs here — it takes seconds and makes your profit number real.')
