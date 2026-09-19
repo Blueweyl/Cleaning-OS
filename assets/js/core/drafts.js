@@ -19,6 +19,9 @@
   var PREFIX = 'cleanflow:draft:';
   var MAX_AGE_DAYS = 14;      // older than this and it is not worth offering back
 
+  // Said once per session, never on every keystroke.
+  var warnedUnavailable = false;
+
   /** Storage can be unavailable (private mode, a locked-down browser). */
   function store() {
     try {
@@ -29,14 +32,28 @@
 
   function save(name, data) {
     var ls = store();
-    if (!ls) return false;
+    if (!ls) return announceFailure();
     try {
       ls.setItem(PREFIX + name, JSON.stringify({ at: Date.now(), data: data }));
       return true;
     } catch (e) {
-      // A full quota must never break typing — the draft is a convenience.
-      return false;
+      // A full quota or a locked-down browser must never break typing — but it
+      // must not be silent either. Believing a draft is safe when it is not is
+      // worse than knowing it isn't, so say so once and let them decide whether
+      // to print or save now.
+      return announceFailure();
     }
+  }
+
+  function announceFailure() {
+    if (!warnedUnavailable) {
+      warnedUnavailable = true;
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('This browser will not keep an unsaved draft — save or print ' +
+                    'before you leave this screen', { tone: 'bad', duration: 7000 });
+      }
+    }
+    return false;
   }
 
   function load(name) {

@@ -13,10 +13,14 @@
   var draft = null;
   var showCalc = false;
   var editingPrice = false;
+  // What the draft looked like the moment it was created, so leaving an
+  // untouched calculator doesn't ask a pointless question.
+  var pristine = null;
 
   /** Drop the working quote and its recovery copy together. */
   function discardDraft() {
     draft = null;
+    pristine = null;
     if (CF.drafts) CF.drafts.clear('quote');
   }
 
@@ -44,6 +48,19 @@
     };
     showCalc = false;
     editingPrice = false;
+    pristine = JSON.stringify(draft);
+  }
+
+  /**
+   * Has this quote had real work put into it?
+   *
+   * A draft recovered from a previous session counts by definition — it
+   * survived a reload, so it is not something we should throw away quietly.
+   */
+  function quoteStarted() {
+    if (!draft) return false;
+    if (pristine === null) return true;
+    return JSON.stringify(draft) !== pristine;
   }
 
   /* ---- Builder ------------------------------------------------------------------ */
@@ -64,7 +81,10 @@
     // is an explicit request for a new quote about someone specific, so that
     // wins over a leftover draft — otherwise the wrong client's numbers would
     // be sitting on screen under their name.
-    if (!draft && !(query && query.client)) draft = CF.drafts.load('quote') || null;
+    if (!draft && !(query && query.client)) {
+      draft = CF.drafts.load('quote') || null;
+      if (draft) pristine = null;      // recovered work; treat it as unsaved
+    }
     if (!draft) reset(query);
 
     var services = Q.activeServices();
@@ -72,7 +92,7 @@
     var addons = CF.store.all('addons');
 
     var page = el('div.anim-fade-up', [
-      U.backLink('Back to Money', function () { discardDraft(); go('#/money'); }),
+      U.backLink('Back to Money', function () { leave(go); }),
       el('h1.h-page.mb-5', 'Smart Quote Calculator')
     ]);
 
@@ -93,6 +113,25 @@
     /** Keep the in-progress quote recoverable. Cleared the moment it is saved. */
     function remember() {
       if (draft) CF.drafts.save('quote', draft);
+    }
+
+    /**
+     * Leaving by the back link abandons the quote, as it always has. It just
+     * asks first now: a back-swipe is easy to do by accident on a phone, and
+     * there is no saved quote to return to.
+     */
+    function leave(goTo) {
+      if (!quoteStarted()) { discardDraft(); goTo('#/money'); return; }
+      CF.ui.confirm({
+        title: 'Leave without saving this quote?',
+        message: 'Nothing has been saved yet, so this price and everything you ' +
+                 'entered will be discarded. Save Quote first if you want to keep it.',
+        confirmLabel: 'Discard It', cancelLabel: 'Keep Editing', danger: true
+      }).then(function (ok) {
+        if (!ok) return;
+        discardDraft();
+        goTo('#/money');
+      });
     }
 
     function calc() {

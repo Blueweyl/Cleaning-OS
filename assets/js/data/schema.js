@@ -306,8 +306,61 @@
     if (!out.checklists.length) out.checklists = defaultChecklists();
     if (!out.templates.length)  out.templates = defaultTemplates();
 
+    freezeAcceptedQuotes(out);
+
     out.schemaVersion = SCHEMA_VERSION;
     return out;
+  }
+
+  /**
+   * Record the tax rate an accepted quote was agreed at.
+   *
+   * Accepted quotes now freeze their price, tax and total, so a later rate
+   * change in Settings cannot rewrite a figure a client already agreed to.
+   * Files written before that carry no rate, and one shape of old record —
+   * an accepted quote with no `tax` field at all — was still re-deriving its
+   * total live, so a rate change moved it ($324.75 became $360).
+   *
+   * Nothing here invents or alters money. Where a tax figure was stored, the
+   * rate is derived from the numbers already in the file. Where none was, the
+   * old build was displaying the current rate, so that is what gets frozen —
+   * the owner sees exactly the total they saw yesterday, and from now on it
+   * holds still.
+   */
+  function freezeAcceptedQuotes(out) {
+    var s = out.settings || {};
+    var enabled = !!s.taxEnabled;
+    var rate = Number(s.taxRate);
+    if (!isFinite(rate) || rate <= 0) rate = 0;
+    rate = Math.min(rate, 100);
+
+    (out.quotes || []).forEach(function (q) {
+      if (!q || q.status !== 'accepted') return;
+      if (q.taxRateAtAccept !== undefined && q.taxRateAtAccept !== null) return;
+
+      var price = Number(q.price);
+      if (!isFinite(price) || price < 0) price = 0;
+      var stored = Number(q.tax);
+
+      if (isFinite(stored)) {
+        // The agreed tax is already in the file — keep it exactly, and record
+        // the rate it implies so the document can say what applied.
+        q.taxRateAtAccept = price > 0
+          ? Math.round((stored / price) * 10000) / 100
+          : 0;
+        q.taxEnabledAtAccept = stored > 0;
+        if (!isFinite(Number(q.total))) {
+          q.total = Math.round((price + stored) * 100) / 100;
+        }
+      } else {
+        // No tax was ever recorded. Freeze what the old build was showing.
+        var tax = enabled ? Math.round(price * rate) / 100 : 0;
+        q.tax = tax;
+        q.total = Math.round((price + tax) * 100) / 100;
+        q.taxRateAtAccept = enabled ? rate : 0;
+        q.taxEnabledAtAccept = enabled;
+      }
+    });
   }
 
   function highestNumber(rows, current) {

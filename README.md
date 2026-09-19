@@ -103,7 +103,10 @@ frozen — and the document notes the rate that applied (*"Sales tax at 8.25%"*)
 Change your rate in Settings afterwards and old accepted quotes are untouched,
 so a signed quote can never disagree with the invoice raised against it. Raised
 invoices and booked jobs are frozen the same way: changing a service price or
-tax rate never rewrites money you've already agreed or billed.
+tax rate never rewrites money you've already agreed or billed. Quotes you
+accepted before this version are covered too: the rate each one was agreed at is
+worked out from the figures already saved with it, so no total changes — they
+just stop being able to drift.
 
 **Money can only go in once, and only what's owed.** A payment has to be a real
 amount above zero and can't exceed what's still outstanding — checked when it's
@@ -123,9 +126,13 @@ a cancelled or finished job can't be quietly restarted.
 **Half-typed work is kept.** The Smart Quote and the Commercial Proposal both
 remember what you've typed as you go, so a refresh, an accidental back-swipe, or
 closing the tab after printing doesn't throw it away — reopen the screen and it's
-still there. Clearing a proposal asks first. These working drafts are kept
-separately from your records: they never show up in a backup, and they're gone
-once you save.
+still there. Leaving a half-built quote by the back link asks before discarding
+it, and so does clearing a proposal; an untouched calculator just closes. These
+working drafts are kept separately from your records: they never show up in a
+backup, and they're gone once you save. If your browser refuses to keep them at
+all — a private window, or storage turned off — CleanFlow tells you once, so you
+know to print or save before you leave the screen rather than finding out the
+hard way.
 
 ---
 
