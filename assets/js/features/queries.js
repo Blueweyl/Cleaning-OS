@@ -188,11 +188,25 @@
     }), 'desc');
   }
 
+  /**
+   * A duration that can actually be used for arithmetic, or 0 so the caller
+   * falls through to the next source. A figure read back out of a saved file
+   * can be negative, Infinity or a string, and that went straight to the
+   * callers: a service saved at -30 minutes gave every job on it an end time
+   * *before* its start, so the clash check reported no overlap however badly
+   * two jobs collided, and the booking screen printed the negative back.
+   */
+  function usableMinutes(value) {
+    var n = Math.round(Number(value));
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.min(n, 20160); // a fortnight — past this it is a typo
+  }
+
   /** How long this job is expected to take, in minutes. */
   function jobMinutes(job) {
     if (!job) return 0;
     var svc = service(job.serviceId);
-    return Number(job.estMinutes) || (svc && Number(svc.estMinutes)) || 120;
+    return usableMinutes(job.estMinutes) || (svc && usableMinutes(svc.estMinutes)) || 120;
   }
 
   function toMinutes(hhmm) {
@@ -213,7 +227,7 @@
   function conflictsFor(candidate) {
     if (!candidate || !candidate.date || !candidate.time) return [];
     var startA = toMinutes(candidate.time);
-    var endA = startA + (Number(candidate.minutes) || 0);
+    var endA = startA + usableMinutes(candidate.minutes);
 
     return liveJobs().filter(function (j) {
       if (j.id === candidate.excludeId) return false;
@@ -718,7 +732,7 @@
     todaysJobsIncludingDone: todaysJobsIncludingDone,
     upcomingJobs: upcomingJobs, overdueJobs: overdueJobs,
     stalledJobs: stalledJobs, nextOccurrence: nextOccurrence,
-    jobMinutes: jobMinutes, conflictsFor: conflictsFor,
+    jobMinutes: jobMinutes, usableMinutes: usableMinutes, conflictsFor: conflictsFor,
     recurringJobs: recurringJobs, completedJobs: completedJobs,
     jobsForClient: jobsForClient, jobTotal: jobTotal, checklistProgress: checklistProgress,
     sortByWhen: sortByWhen,

@@ -324,10 +324,19 @@
     // or 1e20 went in just as readily. A booking is not a refund, so the price
     // is floored at zero and capped like any other stored amount.
     job.price = storedAmount(job.price);
-    if (job.estMinutes !== undefined && job.estMinutes !== null) {
-      var mins = Math.round(Number(job.estMinutes));
-      job.estMinutes = isFinite(mins) && mins > 0 ? Math.min(mins, MAX_MINUTES) : null;
-    }
+
+    // The price is snapshotted at booking so that editing a service later
+    // cannot rewrite what a past job was worth. The planned duration was not:
+    // jobMinutes() fell through to the service's *current* estimate, so
+    // changing Standard Cleaning from 150 minutes to 999 rewrote how long
+    // every job ever booked was supposed to take, completed ones included —
+    // and with them the clash check on any day they sit on. Snapshotted the
+    // same way the price is. A job already in the file keeps falling back to
+    // its service, because inventing a figure for it would be the same fault
+    // in the other direction.
+    var mins = Math.round(Number(job.estMinutes));
+    if (!isFinite(mins) || mins <= 0) mins = svc ? Math.round(Number(svc.estMinutes)) : NaN;
+    job.estMinutes = isFinite(mins) && mins > 0 ? Math.min(mins, MAX_MINUTES) : null;
 
     return S().insert('jobs', job, 'Book job', {
       icon: '📅',
@@ -605,6 +614,7 @@
       date: next || F().addDays(job.completedDate || job.date, days),
       time: job.time,
       price: job.price,
+      estMinutes: job.estMinutes || null,
       address: job.address,
       notes: job.notes,
       recurrence: {

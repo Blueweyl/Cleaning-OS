@@ -310,8 +310,9 @@ Everything in **Settings** (the circle button, top right):
 - **Follow-up timing** — how long before a quote is "stale" or a client is
   "ready to rebook"
 
-Jobs keep their own copy of the checklist from when they were booked, so editing
-a template never rewrites the history of work already done.
+Jobs keep their own copy of the checklist, price and expected time from when
+they were booked, so editing a service or a template later never rewrites the
+history of work already done.
 
 ---
 
@@ -320,6 +321,8 @@ a template never rewrites the history of work already done.
 - Press **`/`** or **Ctrl/Cmd + K** to search anything
 - **Undo** appears in the toast after most changes
 - Anything destructive asks first, and says exactly what will happen
+- Long lists show the most recent 200 with a **Show all** link underneath, so a
+  few years of finished jobs never leaves you waiting for the screen to draw
 - **Print / Save PDF** on invoices, quotes and proposals prints clean, without
   the app chrome around it
 

@@ -12,6 +12,7 @@
 
   var view = 'today';
   var manageOpenId = null;
+  var showAll = false;
   var timerHandle = null;
 
   /* ---- List ----------------------------------------------------------------- */
@@ -57,7 +58,7 @@
     page.appendChild(U.tabs({
       label: 'Job views',
       value: view,
-      onChange: function (v) { view = v; manageOpenId = null; CF.shell.repaint(); },
+      onChange: function (v) { view = v; manageOpenId = null; showAll = false; CF.shell.repaint(); },
       options: [
         { value: 'today',     label: 'Today',     count: buckets.today.length },
         { value: 'upcoming',  label: 'Upcoming',  count: buckets.upcoming.length },
@@ -76,7 +77,11 @@
       return page;
     }
 
-    page.appendChild(el('div.list', rows.map(jobCard)));
+    // Years of finished jobs would otherwise draw a card each; see ui.cappedList.
+    page.appendChild(U.cappedList({
+      rows: rows, row: jobCard, noun: 'job', showAll: showAll,
+      onShowAll: function () { showAll = true; CF.shell.repaint(); }
+    }));
     return page;
 
     function emptyCopy() {

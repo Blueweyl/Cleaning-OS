@@ -10,6 +10,9 @@
   function el() { return CF.dom.el.apply(null, arguments); }
 
   var tab = 'overview';
+  // Reset whenever the tab changes, so asking for every invoice does not also
+  // draw every expense. See ui.cappedList for why long lists wait behind a tap.
+  var showAll = false;
   var monthOffset = 0;
 
   /* ---- Overview -------------------------------------------------------------- */
@@ -72,7 +75,7 @@
 
       U.tabs({
         label: 'Money views', value: tab,
-        onChange: function (v) { tab = v; CF.shell.repaint(); },
+        onChange: function (v) { tab = v; showAll = false; CF.shell.repaint(); },
         options: [
           { value: 'overview', label: 'Overview' },
           { value: 'quotes',   label: 'Quotes',   count: Q.quotes().length },
@@ -204,7 +207,9 @@
         el('button.linkbtn', { type: 'button',
           onclick: function () { CF.backup.exportCsv('quotes'); } }, 'Export CSV')
       ]),
-      el('div.list', rows.map(function (q) {
+      U.cappedList({ rows: rows, noun: 'quote', showAll: showAll,
+        onShowAll: function () { showAll = true; CF.shell.repaint(); },
+        row: function (q) {
         var st = CF.schema.QUOTE_STATUS.filter(function (s) { return s.id === q.status; })[0]
                  || { label: q.status, tone: 'neutral' };
         return el('button.listrow', {
@@ -220,7 +225,7 @@
             U.badge(st.label, st.tone)
           ])
         ]);
-      }))
+        } })
     ]);
   }
 
@@ -246,7 +251,9 @@
         el('button.linkbtn', { type: 'button',
           onclick: function () { CF.backup.exportCsv('invoices'); } }, 'Export CSV')
       ]),
-      el('div.list', rows.map(function (inv) {
+      U.cappedList({ rows: rows, noun: 'invoice', showAll: showAll,
+        onShowAll: function () { showAll = true; CF.shell.repaint(); },
+        row: function (inv) {
         var st = Q.invoiceStatus(inv);
         return el('button.listrow', {
           type: 'button', onclick: function () { go('#/money/invoice/' + inv.id); }
@@ -265,7 +272,7 @@
             U.badge(st.label, st.tone)
           ])
         ]);
-      }))
+        } })
     ]);
   }
 
@@ -304,7 +311,9 @@
       ]) : null,
 
       rows.length
-        ? el('div.list', rows.map(function (e) {
+        ? U.cappedList({ rows: rows, noun: 'expense', showAll: showAll,
+            onShowAll: function () { showAll = true; CF.shell.repaint(); },
+            row: function (e) {
             return el('div.listrow', [
               el('div.grow', [
                 el('div.listrow__title', e.category),
@@ -316,7 +325,7 @@
                 onclick: function () { deleteExpense(e); }
               }, '✕')
             ]);
-          }))
+            } })
         : el('div.empty--soft', { style: { textAlign: 'center', padding: '36px 24px' } },
             'Log gas, supplies and other costs here — it takes seconds and makes your profit number real.')
     ]);

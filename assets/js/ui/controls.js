@@ -12,6 +12,10 @@
   var seq = 0;
   function nextId(prefix) { return (prefix || 'f') + '-' + (++seq); }
 
+  // How many rows a long list draws before offering the rest. Chosen to keep
+  // the slowest screen on a phone under a fifth of a second; see cappedList.
+  var LIST_CAP = 200;
+
   /* ---- Fields --------------------------------------------------------------- */
 
   /**
@@ -182,6 +186,48 @@
     ]);
   }
 
+  /* ---- Long lists ------------------------------------------------------------------ */
+
+  /**
+   * A list that stays fast once a business has years of history behind it.
+   *
+   * Three years of work is roughly 1,500 finished jobs and as many invoices,
+   * and rendering a row for every one cost over a second and 13,500 DOM nodes
+   * — on a phone, a visible stall every time the tab was touched. The newest
+   * rows are the ones being looked for, so the rest wait behind one tap.
+   *
+   * Nothing is hidden and no figure changes: the tab counts, the totals and
+   * the CSV export all still come from the whole set, because they are read
+   * from the data and not from what happens to be on screen.
+   *
+   * `config.cap` rows are drawn unless `config.showAll` is set; `onShowAll`
+   * is called when the owner asks for the rest. A list shorter than the cap
+   * renders exactly as it did before, with no extra markup at all.
+   */
+  function cappedList(config) {
+    var rows = Array.isArray(config.rows) ? config.rows : [];
+    var cap = config.cap > 0 ? config.cap : LIST_CAP;
+    var shown = config.showAll ? rows : rows.slice(0, cap);
+    var held = rows.length - shown.length;
+    var list = el('div.list', shown.map(config.row));
+    if (held <= 0) return list;
+
+    var noun = config.noun || 'record';
+    return el('div', [
+      list,
+      el('div.card.card--roomy', { style: { textAlign: 'center' } }, [
+        el('div.meta', 'Showing the ' + shown.length + ' most recent of ' +
+          rows.length + ' — ' + held + ' older ' +
+          (held === 1 ? noun + ' is' : plural(noun) + ' are') + ' further back.'),
+        el('button.linkbtn', {
+          type: 'button', style: { marginTop: '6px' }, onclick: config.onShowAll
+        }, 'Show all ' + rows.length)
+      ])
+    ]);
+
+    function plural(word) { return /s$/.test(word) ? word : word + 's'; }
+  }
+
   /* ---- Page header ----------------------------------------------------------------- */
 
   function pageHeader(config) {
@@ -258,6 +304,7 @@
     field: field, segmented: segmented, tabs: tabs, checkRow: checkRow,
     badge: badge, statusBadge: statusBadge,
     empty: empty, emptySoft: emptySoft, loading: loading,
+    cappedList: cappedList, LIST_CAP: LIST_CAP,
     pageHeader: pageHeader, sectionHeader: sectionHeader, backLink: backLink,
     kpi: kpi, stat: stat, avatar: avatar, progress: progress,
     defRow: defRow, accessNote: accessNote
