@@ -98,7 +98,13 @@
   function money(value) {
     var n = Number(value);
     if (!isFinite(n) || n <= 0) return null;
-    var cents = Math.round(Math.min(n, MAX_AMOUNT) * 100) / 100;
+    // Above the cap this used to clamp, so typing 1e20 booked a charge of
+    // $10,000,000 and said nothing. A figure the owner typed is either the
+    // figure or a mistake; quietly substituting a different one is the thing
+    // this whole layer exists to prevent. storedAmount still clamps, because a
+    // value already in the database has to be made usable somehow.
+    if (n > MAX_AMOUNT) return null;
+    var cents = Math.round(n * 100) / 100;
     return cents > 0 ? cents : null;
   }
 
@@ -384,6 +390,11 @@
   function pauseJob(id) {
     var job = S().find('jobs', id);
     if (!job || !job.startedAt) return job;
+    // start and resume both refuse a terminal job; pause did not, and a
+    // cancelled or completed job left with a stale startedAt — a crash mid-clean,
+    // a restored file, a second tab — banked an hour of work onto a record whose
+    // invoice was already raised. A terminal job's clock is history.
+    if (job.status === 'completed' || job.status === 'cancelled') return job;
     return S().update('jobs', id, {
       startedAt: null,
       elapsedSeconds: elapsedSeconds(job)
@@ -488,6 +499,12 @@
       // The invoice was built from these lines and the client has it. Dropping
       // one now left the job and the bill describing different work.
       return warn('That job is closed — its charges are on an invoice already');
+    }
+    if (job.status === 'cancelled') {
+      // addExtraCharge already refuses a cancelled job. Removing from one was
+      // still allowed, so a called-off visit's record could be edited after the
+      // fact while nothing else about it could be.
+      return warn('That job was cancelled — its record is closed');
     }
     return S().update('jobs', jobId, {
       extras: asArray(job.extras).filter(function (e) { return e && e.id !== extraId; })
@@ -853,7 +870,18 @@
     return quote;
   }
 
+  /* The only statuses a quote can hold. Everything that reads a quote — the
+     lists, the follow-up nudges, acceptQuote's freeze guard — branches on these
+     four, so a fifth value makes a quote invisible to all of them. */
+  var QUOTE_STATUSES = ['draft', 'sent', 'accepted', 'declined'];
+
   function setQuoteStatus(quoteId, status) {
+    // This wrote whatever it was handed: "SENT", "approved", 42, null, {} and a
+    // string with a control character in it all became a quote's status, and a
+    // quote in a status nothing recognises is a quote nothing will ever show.
+    if (typeof status !== 'string' || QUOTE_STATUSES.indexOf(status) === -1) {
+      return warn('That is not a quote status');
+    }
     var patch = { status: status };
     if (status === 'sent') patch.sentDate = F().today();
     return S().update('quotes', quoteId, patch, 'Quote ' + status);
@@ -1035,6 +1063,7 @@
     createInvoiceForJob: createInvoiceForJob, recordPayment: recordPayment,
     removePayment: removePayment,
     saveQuote: saveQuote, setQuoteStatus: setQuoteStatus, acceptQuote: acceptQuote,
+    QUOTE_STATUSES: QUOTE_STATUSES,
     addExpense: addExpense,
     markContacted: markContacted, clearContacted: clearContacted,
     renderTemplate: renderTemplate, checklistFor: checklistFor

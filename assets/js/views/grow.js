@@ -416,5 +416,16 @@
   }
 
   CF.views = CF.views || {};
-  CF.views.grow = { render: render, renderProposal: renderProposal };
+  /**
+   * Forget the proposal being typed.
+   *
+   * `proposal` is module state, so clearing the saved draft was not enough — the
+   * in-memory copy repopulated the form inside a business it was never written
+   * for. A restore calls this the way it calls the quote screen's reset.
+   */
+  function resetProposal() { proposal = null; }
+
+  CF.views.grow = {
+    render: render, renderProposal: renderProposal, resetProposal: resetProposal
+  };
 })(window.CF = window.CF || {});

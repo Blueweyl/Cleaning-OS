@@ -79,5 +79,27 @@
     try { ls.removeItem(PREFIX + name); } catch (e) { /* nothing to do */ }
   }
 
-  CF.drafts = { save: save, load: load, clear: clear };
+  /**
+   * Drop every draft.
+   *
+   * A restore replaces the whole business, and a draft is text typed against the
+   * one being replaced. Left in place, a proposal written before the restore
+   * reappeared inside the restored business. Clearing them centrally beats a
+   * clear() call in each view, which is how the proposal came to be missed while
+   * the quote screen happened to be covered.
+   */
+  function clearAll() {
+    var ls = store();
+    if (!ls) return;
+    try {
+      var keys = [];
+      for (var i = 0; i < ls.length; i++) {
+        var k = ls.key(i);
+        if (k && k.indexOf(PREFIX) === 0) keys.push(k);
+      }
+      keys.forEach(function (k) { ls.removeItem(k); });
+    } catch (e) { /* a draft left behind is not worth failing a restore over */ }
+  }
+
+  CF.drafts = { save: save, load: load, clear: clear, clearAll: clearAll };
 })(window.CF = window.CF || {});

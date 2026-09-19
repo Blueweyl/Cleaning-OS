@@ -126,6 +126,10 @@ is kept if you don't use one of the listed ones. This matters more than it
 sounds: a single unchecked expense used to be able to make your whole profit
 figure unreadable.
 
+**Once a job is finished or called off, its record is closed.** Charges can't be
+added or removed, and the timer can't be started, paused or resumed — even if the
+job was left mid-clean when the app closed.
+
 **A restored backup can't poison your books.** Files get edited, truncated,
 copied between devices and synced by other apps. On restore, CleanFlow checks the
 shape of every financial record before anything is shown: a payment list that
@@ -205,6 +209,10 @@ to 0 does exactly that — nudge straight away, due on issue — instead of quie
 falling back to the default while the screen still reads "0 days". Day counts have
 sensible upper limits, so a mistyped figure can't produce an invoice due date that
 isn't a date.
+
+**An amount you type that is far too large is refused, not quietly reduced.** A
+figure already in your file is a different matter — that has to be made usable
+somehow, so it is capped and the screen tells you when a total no longer adds up.
 
 **A job can't be booked for a negative amount**, and neither can a base price you
 set during setup or in Settings. Anything odd — a stray minus sign, or a figure

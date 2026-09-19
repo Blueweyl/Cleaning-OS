@@ -202,6 +202,20 @@
   /** Apply an inspected backup. Undo still works immediately afterwards. */
   function applyRestore(data) {
     CF.store.replace(data, 'Restore backup');
+
+    // Everything the UI is holding was typed against the business that has just
+    // been replaced: saved drafts, and the quote screen's in-memory one. The
+    // views each clearing their own left gaps — the proposal draft reappeared
+    // inside the restored business — so it is invalidated here, in the one place
+    // that knows a restore happened.
+    if (CF.drafts && CF.drafts.clearAll) CF.drafts.clearAll();
+    if (CF.views && CF.views.quote && CF.views.quote.reset) {
+      try { CF.views.quote.reset({}); } catch (e) { /* a view reset must not fail a restore */ }
+    }
+    if (CF.views && CF.views.grow && CF.views.grow.resetProposal) {
+      try { CF.views.grow.resetProposal(); } catch (e) { /* as above */ }
+    }
+
     CF.store.logActivity({ icon: '⬇️', text: 'Restored data from a backup file' });
     return CF.store.flush();
   }
