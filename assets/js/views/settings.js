@@ -483,11 +483,15 @@
     function editTax() {
       var s = CF.store.get().settings;
       var next = { enabled: s.taxEnabled, rate: s.taxRate, label: s.taxLabel };
+      var rateValid = true;
+      // Declared out here because the Save handler lives in a sibling closure
+      // and has to be able to re-show the error.
+      var rateField = null;
       CF.ui.modal({
         size: 'sm', title: 'Tax',
         sub: 'Applied to new invoices. Existing invoices keep the tax they were raised with.',
         body: function () {
-          var rateField = CF.ui.field({
+          rateField = CF.ui.field({
             label: 'Rate (%)', value: next.rate, type: 'number', inputmode: 'decimal',
             min: 0, max: 100,
             hint: 'A percentage, e.g. 8.25 — not the amount.',
@@ -496,10 +500,15 @@
               // A stray minus sign here would quietly discount every invoice.
               if (v !== '' && (!isFinite(n) || n < 0 || n > 100)) {
                 rateField.setError('Enter a rate between 0 and 100.');
-                next.rate = 0;
+                // Keep the last good rate. Falling back to 0 meant that typing
+                // 150, reading the error and saving anyway charged no tax from
+                // then on — the opposite of what was asked for, with nothing
+                // said. Save is blocked instead, so the number cannot be lost.
+                rateValid = false;
                 return;
               }
               rateField.setError('');
+              rateValid = true;
               next.rate = isFinite(n) ? n : 0;
             }
           });
@@ -524,6 +533,11 @@
             el('button.btn.btn--primary', {
               type: 'button',
               onclick: function () {
+                if (!rateValid) {
+                  if (rateField) rateField.setError('Enter a rate between 0 and 100.');
+                  CF.ui.toast('Fix the tax rate before saving', { tone: 'bad' });
+                  return;
+                }
                 CF.store.commit('Edit tax', function (d) {
                   d.settings.taxEnabled = next.enabled;
                   d.settings.taxRate = next.rate;

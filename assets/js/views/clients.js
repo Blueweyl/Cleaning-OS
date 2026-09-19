@@ -230,7 +230,15 @@
 
       stats.outstanding > 0
         ? el('div.callout.callout--warn.mb-4',
-            F.money(stats.outstanding) + ' still outstanding from this client.')
+            F.money(stats.outstanding) + ' still outstanding from this client.' +
+            // An outstanding figure built partly from an invoice that does not
+            // add up must not be presented as settled fact just because this is
+            // not the invoice screen.
+            (Q.openInvoices().some(function (i) {
+              return i.clientId === c.id && Q.invoiceInconsistent(i);
+            })
+              ? ' One of these invoices does not add up — check it before chasing.'
+              : ''))
         : null,
 
       el('div.stack.stack-3', sections().map(accordion)),

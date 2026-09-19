@@ -194,6 +194,15 @@ with no bookings yet, or a client you archived, still counts as something to
 warn you about. If a file isn't a genuine CleanFlow backup, it's refused rather
 than imported as junk.
 
+**An invoice that doesn't add up says so everywhere its figure appears** — on the
+job, on the client and on the invoice itself — not only on the one screen you
+happened to open. CleanFlow never rewrites a figure you billed; it points at the
+disagreement and leaves the decision to you.
+
+**A tax rate outside 0–100 can't be saved.** Your current rate is kept until you
+enter a valid one, so a mistyped rate can never quietly turn into charging no tax
+at all.
+
 **If a backup holds an invoice whose payment history can't be read**, the restore
 says so before you confirm. Those invoices come back showing as unpaid — the safe
 way round, since chasing money you already received is easily sorted out and

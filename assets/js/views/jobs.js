@@ -237,7 +237,16 @@
           U.progress(progress.percent)
         ]) : null,
 
-        el('div.mt-5', primaryAction()),
+        el('div.mt-5', [
+          primaryAction(),
+          // The invoice screen says when a billed figure disagrees with its own
+          // lines. Showing the same figure here as plain fact made the warning
+          // depend on which screen the owner happened to open.
+          invoice && Q.invoiceInconsistent(invoice)
+            ? el('div.meta.mt-2', { style: { color: 'var(--warn-text)' } },
+                '⚠ This invoice does not add up — open it before chasing the balance.')
+            : null
+        ].filter(Boolean)),
 
         el('div.mt-4', [
           el('details', [
