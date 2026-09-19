@@ -956,6 +956,23 @@
    * Fill a message template. Unknown tokens are stripped rather than left
    * as `{client}` in a message someone is about to send a paying customer.
    */
+  /**
+   * One token's value, fit to appear in a message sent to a client.
+   *
+   * Checking only for undefined and null let NaN, Infinity, "[object Object]"
+   * and a comma-joined array through into text the owner copies and sends. A
+   * value that cannot be written out as a word or a figure is left blank
+   * instead: an empty gap reads as a mistake, "[object Object]" reads as
+   * something worse.
+   */
+  function fillable(value) {
+    if (value === undefined || value === null) return '';
+    if (typeof value === 'number') return isFinite(value) ? String(value) : '';
+    if (typeof value === 'boolean') return value ? 'yes' : 'no';
+    if (typeof value !== 'string') return '';
+    return value;
+  }
+
   function renderTemplate(body, vars) {
     var biz = S().get().business;
     var s = S().get().settings;
@@ -965,9 +982,9 @@
       referralOffer: s.referralOffer || ''
     }, vars || {});
 
-    return String(body || '')
+    return String(body === 0 ? '0' : (body || ''))
       .replace(/\{(\w+)\}/g, function (match, key) {
-        return all[key] !== undefined && all[key] !== null ? String(all[key]) : '';
+        return fillable(all[key]);
       })
       .replace(/\s{2,}/g, ' ')
       .trim();
