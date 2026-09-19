@@ -171,6 +171,24 @@
       if (bad) { badTotal += bad; warnings.push(bad + ' unreadable ' + key.slice(0, -1) + ' record(s)'); }
     });
 
+    // A record can be a perfectly good object with an id and still carry a
+    // payment history that is not a list. Loading repairs the shape by dropping
+    // it, which reads as unpaid — the safe direction, since chasing money that
+    // was already paid is recoverable and never chasing it is not. But money
+    // recorded as received must not disappear without a word, so it is named
+    // here rather than left to be noticed in the accounts months later.
+    if (Array.isArray(data.invoices)) {
+      var lostHistory = data.invoices.filter(function (r) {
+        return r && typeof r === 'object' && r.id &&
+               r.payments !== undefined && r.payments !== null &&
+               !Array.isArray(r.payments);
+      }).length;
+      if (lostHistory) {
+        warnings.push(lostHistory + ' invoice(s) whose payment history cannot be read — ' +
+          'they will show as unpaid, so check them against your records');
+      }
+    }
+
     // Entirely made of junk is a corrupt file, not a recoverable one.
     var totalRows = present.reduce(function (a, k) { return a + data[k].length; }, 0);
     if (totalRows > 0 && badTotal === totalRows) {

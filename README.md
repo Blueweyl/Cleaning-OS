@@ -194,6 +194,11 @@ with no bookings yet, or a client you archived, still counts as something to
 warn you about. If a file isn't a genuine CleanFlow backup, it's refused rather
 than imported as junk.
 
+**If a backup holds an invoice whose payment history can't be read**, the restore
+says so before you confirm. Those invoices come back showing as unpaid — the safe
+way round, since chasing money you already received is easily sorted out and
+never chasing it is not — so check them against your records.
+
 **If a rescue can only save part of a damaged file**, the work it recovers stays
 billable. A finished job whose invoice the damage destroyed will raise a fresh
 one from *Create Invoice* rather than pointing at something that is no longer
