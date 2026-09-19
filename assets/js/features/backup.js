@@ -343,7 +343,11 @@
     if (!hasRealWork || db.settings.demoMode) return false;
     var days = daysSinceBackup();
     if (days === null) return true;
-    return days >= (db.settings.backupReminderDays || 7);
+    // Same trap as the other day counts: `|| 7` turned a stored 0 — remind me
+    // every day — into a week of silence.
+    var window = Number(db.settings.backupReminderDays);
+    if (!isFinite(window) || window < 0) window = 7;
+    return days >= window;
   }
 
   function lastBackupLabel() {

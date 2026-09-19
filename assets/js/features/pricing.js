@@ -55,7 +55,11 @@
   }
 
   function round(value) {
-    var step = settings().roundTo || 5;
+    // `|| 5` treated a stored 0 as absent, so Settings read "Round prices to $0"
+    // while a $137 suggestion still came out at $135. Zero is a real answer:
+    // don't round.
+    var raw = Number(settings().roundTo);
+    var step = isFinite(raw) && raw >= 0 ? raw : 5;
     if (step <= 1) return Math.round(value);
     return Math.round(value / step) * step;
   }
