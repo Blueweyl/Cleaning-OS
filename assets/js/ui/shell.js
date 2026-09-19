@@ -598,6 +598,40 @@
 
   /* ---- Restore flow --------------------------------------------------------- */
 
+  /**
+   * Everything a restore is about to replace, counted and named.
+   *
+   * This used to count active clients and jobs only. Someone in their first
+   * week — supplies bought, quotes written, nothing booked yet — or someone
+   * who had archived their clients registered as zero, so the dialog never
+   * said anything would be replaced and the automatic safety copy, which is
+   * only taken when something is here, never ran. Restoring the wrong file
+   * took their records with no warning and no way back.
+   *
+   * Archived clients count: archiving is not deleting, and their history is
+   * what the accounts are built from.
+   */
+  function whatIsHere() {
+    var db = CF.store.get();
+    var parts = [];
+    var total = 0;
+
+    [['clients', 'client'], ['jobs', 'job'], ['quotes', 'quote'],
+     ['invoices', 'invoice'], ['expenses', 'expense']].forEach(function (pair) {
+      var n = (db[pair[0]] || []).filter(function (r) { return r && !r.deletedAt; }).length;
+      if (!n) return;
+      total += n;
+      parts.push(CF.fmt.plural(n, pair[1]));
+    });
+
+    return {
+      total: total,
+      phrase: parts.length > 1
+        ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1]
+        : (parts[0] || 'nothing')
+    };
+  }
+
   /** Pick a backup file, show what is in it, then confirm before replacing. */
   function pickBackupFile(onDone) {
     var input = el('input', {
@@ -617,8 +651,8 @@
     function inspect(file) {
       CF.backup.inspectFile(file).then(function (info) {
         var c = info.counts;
-        var live = CF.store.get();
-        var hereNow = CF.q.activeClients().length + CF.q.jobs().length;
+        var here = whatIsHere();
+        var hereNow = here.total;
 
         var lines = [];
         lines.push((info.businessName ? '"' + info.businessName + '"' : 'This backup') +
@@ -640,8 +674,7 @@
           lines.push('⚠ Skipping ' + info.warnings.join(', ') + '.');
         }
         if (hereNow > 0) {
-          lines.push('This replaces the ' + CF.fmt.plural(CF.q.activeClients().length, 'client') +
-            ' and ' + CF.fmt.plural(CF.q.jobs().length, 'job') + ' already on this device.');
+          lines.push('This replaces the ' + here.phrase + ' already on this device.');
         }
 
         CF.ui.confirm({

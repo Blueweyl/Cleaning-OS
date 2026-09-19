@@ -188,8 +188,11 @@ a backup in your cloud drive or emailed to yourself.
 
 **Before a restore replaces anything**, CleanFlow downloads a safety copy of what
 you currently have, shows you what's inside the file you picked, and asks you to
-confirm. If a file isn't a genuine CleanFlow backup, it's refused rather than
-imported as junk.
+confirm. The confirmation names everything on this device that the restore will
+replace — clients, jobs, quotes, invoices and expenses — so a week of receipts
+with no bookings yet, or a client you archived, still counts as something to
+warn you about. If a file isn't a genuine CleanFlow backup, it's refused rather
+than imported as junk.
 
 **If CleanFlow ever can't read your saved data**, it stops and says so instead of
 starting empty — because an empty database that saves itself over your real one
