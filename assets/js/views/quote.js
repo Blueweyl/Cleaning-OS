@@ -10,6 +10,12 @@
 
   function el() { return CF.dom.el.apply(null, arguments); }
 
+  /** A scope figure fit to print: never NaN, null or undefined. */
+  function scopeNumber(value, fallback) {
+    var n = Number(value);
+    return isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+  }
+
   var draft = null;
   var showCalc = false;
   var editingPrice = false;
@@ -490,8 +496,11 @@
           el('div.doc__label', 'Scope'),
           el('div.doc__body', [
             Q.serviceName(quote.serviceId), ' · ',
-            Number(quote.sqft).toLocaleString(), ' sq ft · ',
-            F.plural(quote.beds, 'bed'), ' · ', F.plural(quote.baths, 'bath'),
+            // A quote restored from an edited file can carry junk here, and this
+            // is the page the client reads. Never print NaN at them.
+            scopeNumber(quote.sqft, 1200).toLocaleString(), ' sq ft · ',
+            F.plural(scopeNumber(quote.beds, 2), 'bed'), ' · ',
+            F.plural(scopeNumber(quote.baths, 1), 'bath'),
             (quote.addonIds || []).length
               ? el('div.mt-2', 'Includes: ' + (quote.addonIds || []).map(function (id) {
                   var a = CF.store.find('addons', id);

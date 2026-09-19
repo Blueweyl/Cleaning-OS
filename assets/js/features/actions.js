@@ -786,7 +786,26 @@
 
   /* ---- Quotes --------------------------------------------------------------- */
 
+  /**
+   * A scope figure on a quote: square feet, bedrooms, bathrooms.
+   *
+   * These go straight onto the document the client reads, which rendered
+   * "NaN sq ft - null beds - undefined baths" when a restored or hand-edited
+   * quote carried junk. A scope figure that cannot be read is replaced by the
+   * same default a new quote starts from.
+   */
+  function scopeFigure(value, fallback, max) {
+    var n = Number(value);
+    if (!isFinite(n) || n < 0) return fallback;
+    return Math.min(Math.round(n), max);
+  }
+
   function saveQuote(data) {
+    var clean = Object.assign({}, data);
+    if ('sqft'  in clean) clean.sqft  = scopeFigure(clean.sqft, 1200, 200000);
+    if ('beds'  in clean) clean.beds  = scopeFigure(clean.beds, 2, 30);
+    if ('baths' in clean) clean.baths = scopeFigure(clean.baths, 1, 30);
+
     var quote = S().insert('quotes', Object.assign({
       number: S().nextNumber('quote'),
       clientId: null, clientName: '', clientPhone: '',
@@ -800,7 +819,7 @@
       date: F().today(),
       sentDate: null,
       notes: ''
-    }, data), 'Save quote', {
+    }, clean), 'Save quote', {
       icon: '📝',
       text: 'Quote saved for ' + (data.clientName || CF.q.clientName(data.clientId)) +
             ' — ' + F().money(data.price)
