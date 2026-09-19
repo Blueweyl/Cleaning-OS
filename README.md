@@ -201,7 +201,16 @@ read-only with a banner and a *Use This Tab* button, so two copies can't overwri
 each other's work. Pressing *Use This Tab* re-reads your data from the device
 first, so anything the other tab did in the meantime is picked up rather than
 being written over — a payment recorded in one tab is never lost by switching to
-the other.
+the other. If two tabs try to take over at the same instant, they settle it
+between themselves within a couple of seconds; you may see the banner briefly in
+both, but two tabs never end up saving at once.
+
+**A save cut off part-way is recovered, not mistaken for an empty app.** Every
+change is written synchronously as the tab closes, so the *last* thing you did
+survives — not the one before it. If the main store was left half-written,
+CleanFlow reads the backup copy instead and tells you it did. And if neither copy
+can be read, it stops and says so rather than opening as if you were a new user:
+your data is set aside, nothing is overwritten, and you're offered a restore.
 
 **Damaged data is recovered, not written off.** The usual cause of corruption is a
 save that got cut off part-way — and the start of the file is still perfectly

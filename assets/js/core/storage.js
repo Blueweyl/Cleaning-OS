@@ -237,10 +237,33 @@
       var lsPayload = lsResult.ok ? lsResult.payload : null;
       var winner = newer(idbPayload, lsPayload);
       seq = Math.max(seq, (idbPayload && idbPayload._seq) || 0, (lsPayload && lsPayload._seq) || 0);
+
+      // A value that is present but cannot be understood. A write cut off
+      // part-way leaves exactly this: `unwrap` refuses it, and it must not be
+      // mistaken for the store simply being empty.
+      var idbHadGarbage = raw !== undefined && raw !== null && !idbPayload;
+
+      // Nothing usable anywhere, and evidence that something was there. This
+      // is the case this whole file exists for: a read that FAILED must never
+      // look like a store that is EMPTY, because the next keystroke would
+      // write an empty database over the top of a real business.
+      if (!winner && (lsResult.corrupt || idbHadGarbage)) {
+        lastError = lsResult.error || new Error('Stored data was unreadable');
+        return {
+          ok: false,
+          error: lastError,
+          corrupt: true,
+          quarantinedAs: quarantined
+        };
+      }
+
       return {
         ok: true,
         data: winner ? winner.data : null,
-        recoveredFrom: (winner && winner === lsPayload && idbPayload) ? 'localStorage' : null,
+        // The mirror standing in for IndexedDB is worth saying out loud,
+        // whether the IndexedDB side was stale or unreadable.
+        recoveredFrom: (winner && winner === lsPayload && (idbPayload || idbHadGarbage))
+          ? 'localStorage' : null,
         corrupt: !!lsResult.corrupt,
         quarantinedAs: quarantined
       };

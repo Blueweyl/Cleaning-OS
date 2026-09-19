@@ -23,6 +23,7 @@
 
   var tabId = 'tab-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   var isWriter = true;
+  var myLockAt = 0;         // when this tab last wrote the lock
   var channel = null;
   var timer = null;
   var listeners = [];
@@ -39,7 +40,9 @@
 
   function writeLock() {
     try {
-      localStorage.setItem(LOCK_KEY, JSON.stringify({ id: tabId, at: now() }));
+      var at = now();
+      localStorage.setItem(LOCK_KEY, JSON.stringify({ id: tabId, at: at }));
+      myLockAt = at;
       return true;
     } catch (e) { return false; }
   }
@@ -49,6 +52,12 @@
     if (lock && lock.id === tabId) {
       try { localStorage.removeItem(LOCK_KEY); } catch (e) {}
     }
+  }
+
+  /** Another tab holds the lock right now. */
+  function someoneElseHoldsIt() {
+    var held = readLock();
+    return !!(held && held.id !== tabId && (now() - (held.at || 0)) <= STALE_MS);
   }
 
   function setWriter(value) {
@@ -95,14 +104,38 @@
         if (!isWriter) {
           sawWriter = false;
           setTimeout(function () {
-            if (!isWriter && !sawWriter) takeOver(true);
+            // Re-read the lock. Nobody answering the ping does not prove
+            // nobody has claimed: two tabs whose probes time out together
+            // would otherwise both take over, and both write.
+            if (!isWriter && !sawWriter && !someoneElseHoldsIt()) takeOver(true);
           }, PROBE_MS);
         }
       } catch (e) { channel = null; }
     }
 
     timer = setInterval(function () {
-      if (isWriter) { writeLock(); return; }
+      if (isWriter) {
+        // Holding the lock is not the same as still owning it. Two tabs can
+        // claim in the same instant — each sets itself writer before the
+        // other's claim message lands, so neither stands down — and this tick
+        // used to just rewrite the lock and carry on. Three tabs all believed
+        // they were the writer, and all three wrote.
+        //
+        // The stored lock is the single source of truth, and it is checked
+        // before it is renewed. A lock written at or after this tab's own last
+        // write belongs to whoever claimed most recently, so this tab yields.
+        // Every tab reaches the same verdict from the same value, which leaves
+        // exactly one writer and cannot oscillate.
+        var held = readLock();
+        if (held && held.id !== tabId &&
+            (now() - (held.at || 0)) <= STALE_MS &&
+            (held.at || 0) >= myLockAt) {
+          setWriter(false);
+          return;
+        }
+        writeLock();
+        return;
+      }
 
       // The writing tab may have been closed; take over once its lock goes stale.
       var current = readLock();
@@ -114,7 +147,7 @@
         sawWriter = false;
         try { channel.postMessage({ type: 'ping', from: tabId }); } catch (e) {}
         setTimeout(function () {
-          if (!isWriter && !sawWriter) takeOver(true);
+          if (!isWriter && !sawWriter && !someoneElseHoldsIt()) takeOver(true);
         }, PROBE_MS);
       }
     }, HEARTBEAT_MS);
