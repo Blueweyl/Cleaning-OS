@@ -596,8 +596,13 @@
       items.push({
         tone: 'bad',
         title: 'Overdue invoice — ' + clientName(inv.clientId, inv.clientName),
+        // An invoice whose total disagrees with its own lines is flagged on the
+        // invoice, the job and the client. This prompt names the same figure and
+        // said nothing, so whether the owner learned it was disputed still
+        // depended on where they looked.
         sub: F().money(invoiceRemaining(inv)) + ' · ' +
-             F().plural(st.daysLate || 0, 'day') + ' overdue',
+             F().plural(st.daysLate || 0, 'day') + ' overdue' +
+             (invoiceInconsistent(inv) ? ' · does not add up' : ''),
         cta: 'View',
         route: '#/money/invoice/' + inv.id
       });

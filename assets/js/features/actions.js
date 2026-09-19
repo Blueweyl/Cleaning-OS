@@ -986,7 +986,12 @@
       .replace(/\{(\w+)\}/g, function (match, key) {
         return fillable(all[key]);
       })
-      .replace(/\s{2,}/g, ' ')
+      // Tidy the gap a removed token leaves ("invoice  for" -> "invoice for")
+      // without flattening the owner's own layout. /\s{2,}/ did both: a message
+      // written with paragraphs arrived as a single run-on line.
+      .replace(/[^\S\r\n]{2,}/g, ' ')
+      .replace(/[^\S\r\n]+(\r?\n)/g, '$1')
+      .replace(/(\r?\n){3,}/g, '\n\n')
       .trim();
   }
 
