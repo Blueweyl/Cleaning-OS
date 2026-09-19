@@ -17,6 +17,15 @@
   var PER_BED = 12;
   var PER_BATH = 10;
 
+  /**
+   * The ceiling on a single job's price. Nothing a solo cleaner quotes comes
+   * near it, but the override field takes free-typed numbers, and without a cap
+   * a pasted `1e308` overflowed the tax and total to `Infinity` — which
+   * `JSON.stringify` writes into a backup file as `null`, quietly destroying
+   * the figure on restore.
+   */
+  var MAX_PRICE = 10000000;
+
   function settings() { return CF.store.get().settings; }
 
   /**
@@ -102,7 +111,9 @@
                       input.override !== undefined &&
                       input.override !== '' &&
                       !isNaN(Number(input.override));
-    var price = hasOverride ? Math.max(0, Number(input.override)) : suggested;
+    var price = hasOverride
+      ? Math.min(MAX_PRICE, Math.max(0, Number(input.override)))
+      : Math.min(MAX_PRICE, suggested);
 
     // Time estimate scales with the same signals as price.
     var baseMinutes = Number(svc.estMinutes) || 150;

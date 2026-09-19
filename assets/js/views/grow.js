@@ -1,5 +1,9 @@
 /* ==========================================================================
-   🚀 GROW — revenue already sitting in your own client list
+   🚀 GROW — the work your own client list is already worth chasing
+
+   Every money figure on this screen is potential, not earned: a client whose
+   interval has lapsed, a quote nobody has answered. MONEY is the screen for
+   what actually came in.
 
    Every card is earned by real data: a lapsed interval, an unanswered
    quote, a finished job with no review asked. Each one carries a message
@@ -23,8 +27,15 @@
 
     var page = el('div.anim-fade-up', [
       el('h1.h-page', 'Grow Your Business'),
+      // Every figure on this screen is work that has *not* been agreed: a
+      // client who is due but has not said yes, a quote that has not been
+      // answered. Saying "$645 is sitting here" put an unearned number in the
+      // same visual language as the real totals in MONEY, which is how a solo
+      // owner ends up planning around money nobody has promised them.
       el('div.sub.mb-6', potential > 0
-        ? 'About ' + F.money(potential) + ' is sitting in these follow-ups.'
+        ? 'Up to ' + F.money(potential) + ' of potential work is waiting on a ' +
+          'follow-up. Nothing here is booked or confirmed yet — these are ' +
+          'estimates based on your usual prices.'
         : 'A few simple actions could bring in real revenue this week.')
     ]);
 
@@ -62,7 +73,8 @@
       return el('div.opp', [
         el('div.opp__title', config.icon + ' ' + config.title),
         config.revenue ? el('div.opp__revenue', [
-          'Potential revenue: ', el('b', F.money(config.revenue))
+          'Potential value: ', el('b', F.money(config.revenue)),
+          el('span.opp__revenue-note', ' · estimated, not booked')
         ]) : null,
         el('div.opp__why', config.why),
         el('div.stack.stack-2.mt-4', config.items)
@@ -269,20 +281,38 @@
 
   var proposal = null;
 
+  function blankProposal() {
+    return {
+      client: '', property: '',
+      scope: 'Nightly trash removal, kitchen & breakroom sanitation, restroom deep clean, ' +
+             'common area vacuuming and surface disinfecting.',
+      frequency: '5x / week',
+      price: '', period: 'month',
+      terms: 'Net 15 · 90-day minimum commitment · cancel anytime after.',
+      number: CF.store.get().counters.proposal + 1
+    };
+  }
+
+  /** Has anything actually been typed, or is this still the starting text? */
+  function proposalStarted(p) {
+    if (!p) return false;
+    var blank = blankProposal();
+    return ['client', 'property', 'scope', 'frequency', 'price', 'terms']
+      .some(function (k) { return String(p[k] || '') !== String(blank[k] || ''); });
+  }
+
   function renderProposal() {
     var U = CF.ui, F = CF.fmt, go = CF.router.go;
     var biz = CF.store.get().business;
 
-    if (!proposal) {
-      proposal = {
-        client: '', property: '',
-        scope: 'Nightly trash removal, kitchen & breakroom sanitation, restroom deep clean, ' +
-               'common area vacuuming and surface disinfecting.',
-        frequency: '5x / week',
-        price: '', period: 'month',
-        terms: 'Net 15 · 90-day minimum commitment · cancel anytime after.',
-        number: CF.store.get().counters.proposal + 1
-      };
+    // A proposal takes real typing and is never saved as a record — the next
+    // step is Print. A reload after that (or a back-swipe on a phone) used to
+    // wipe it with nothing to recover. Pick the draft back up instead.
+    if (!proposal) proposal = CF.drafts.load('proposal') || blankProposal();
+
+    function remember() {
+      if (proposalStarted(proposal)) CF.drafts.save('proposal', proposal);
+      else CF.drafts.clear('proposal');
     }
 
     var preview = el('div.paper');
@@ -318,9 +348,15 @@
     function bind(label, key, opts) {
       var cfg = Object.assign({
         label: label, value: proposal[key],
-        onInput: function (v) { proposal[key] = v; paintPreview(); }
+        onInput: function (v) { proposal[key] = v; remember(); paintPreview(); }
       }, opts || {});
       return U.field(cfg).node;
+    }
+
+    function discard() {
+      proposal = null;
+      CF.drafts.clear('proposal');
+      CF.shell.repaint();
     }
 
     paintPreview();
@@ -347,7 +383,7 @@
                 { value: 'week', label: 'Week' },
                 { value: 'visit', label: 'Visit' }
               ],
-              onChange: function (v) { proposal.period = v; paintPreview(); }
+              onChange: function (v) { proposal.period = v; remember(); paintPreview(); }
             }).node
           ]),
           bind('Terms', 'terms', { multiline: true, rows: 2 }),
@@ -362,7 +398,15 @@
             }, 'Print / Save PDF'),
             el('button.btn.btn--secondary', {
               type: 'button',
-              onclick: function () { proposal = null; CF.shell.repaint(); }
+              onclick: function () {
+                if (!proposalStarted(proposal)) { discard(); return; }
+                CF.ui.confirm({
+                  title: 'Clear this proposal?',
+                  message: 'Everything you have typed here will be discarded. ' +
+                           'Print or save a PDF first if you still need it.',
+                  confirmLabel: 'Clear It', cancelLabel: 'Keep Typing', danger: true
+                }).then(function (ok) { if (ok) discard(); });
+              }
             }, 'Clear')
           ])
         ]),

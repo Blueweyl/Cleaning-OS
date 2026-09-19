@@ -65,6 +65,30 @@
 
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
+  /**
+   * Is this a real calendar date we are willing to store?
+   *
+   * `fromKey` is forgiving by design — it feeds `new Date`, so '2026-13-45'
+   * quietly becomes February 2027 and '2026-02-30' becomes March 2nd. That is
+   * fine for arithmetic but wrong for a date a person typed or a restored file
+   * supplied: the value must round-trip unchanged, or it is not the date it
+   * claims to be. The year window keeps a mistyped '0226' out, which would
+   * otherwise land in a month bucket no report will ever ask for.
+   */
+  function isDateKey(key) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(key || ''))) return false;
+    var d = fromKey(key);
+    if (!d || isNaN(d.getTime())) return false;
+    if (toKey(d) !== String(key)) return false;
+    var y = d.getFullYear();
+    return y >= 2000 && y <= 2100;
+  }
+
+  /** A date key we can store, or the fallback when the input is not one. */
+  function safeDateKey(key, fallback) {
+    return isDateKey(key) ? String(key) : (fallback === undefined ? today() : fallback);
+  }
+
   function addDays(key, days) {
     var d = fromKey(key) || new Date();
     d.setDate(d.getDate() + days);
@@ -200,6 +224,7 @@
   CF.fmt = {
     money: money, parseMoney: parseMoney,
     today: today, toKey: toKey, fromKey: fromKey, addDays: addDays,
+    isDateKey: isDateKey, safeDateKey: safeDateKey,
     addMonths: addMonths,
     daysBetween: daysBetween, shortDate: shortDate, longDate: longDate,
     relativeDate: relativeDate, agoPhrase: agoPhrase,

@@ -14,6 +14,12 @@
   var showCalc = false;
   var editingPrice = false;
 
+  /** Drop the working quote and its recovery copy together. */
+  function discardDraft() {
+    draft = null;
+    if (CF.drafts) CF.drafts.clear('quote');
+  }
+
   function reset(query) {
     var services = CF.q.activeServices();
     var preClient = query && query.client ? CF.store.find('clients', query.client) : null;
@@ -50,6 +56,15 @@
       if (existing) return renderSaved(existing);
     }
 
+    // A quote is several minutes of tapping before anything is saved. Losing it
+    // to a refresh or a back-swipe used to mean starting the whole thing again,
+    // so the working draft is picked back up here.
+    //
+    // Arriving with a client in the route ("Quote this client" from their page)
+    // is an explicit request for a new quote about someone specific, so that
+    // wins over a leftover draft — otherwise the wrong client's numbers would
+    // be sitting on screen under their name.
+    if (!draft && !(query && query.client)) draft = CF.drafts.load('quote') || null;
     if (!draft) reset(query);
 
     var services = Q.activeServices();
@@ -57,7 +72,7 @@
     var addons = CF.store.all('addons');
 
     var page = el('div.anim-fade-up', [
-      U.backLink('Back to Money', function () { draft = null; go('#/money'); }),
+      U.backLink('Back to Money', function () { discardDraft(); go('#/money'); }),
       el('h1.h-page.mb-5', 'Smart Quote Calculator')
     ]);
 
@@ -70,8 +85,14 @@
     return page;
 
     function paint() {
+      remember();
       paintForm();
       paintPanel();
+    }
+
+    /** Keep the in-progress quote recoverable. Cleared the moment it is saved. */
+    function remember() {
+      if (draft) CF.drafts.save('quote', draft);
     }
 
     function calc() {
@@ -122,12 +143,12 @@
           U.field({
             label: 'Customer name', value: draft.leadName, required: true,
             placeholder: 'e.g. Nina Alvarez',
-            onInput: function (v) { draft.leadName = v; }
+            onInput: function (v) { draft.leadName = v; remember(); }
           }).node,
           U.field({
             label: 'Phone (optional)', value: draft.leadPhone, type: 'tel',
             placeholder: '(512) 555-0100',
-            onInput: function (v) { draft.leadPhone = v; }
+            onInput: function (v) { draft.leadPhone = v; remember(); }
           }).node,
           el('p.meta', 'No full profile needed yet — CleanFlow creates one when they say yes.')
         ]));
@@ -151,6 +172,7 @@
           oninput: function (e) {
             draft.sqft = Number(e.target.value);
             draft.override = null;
+            remember();
             sizeLabel.textContent = formatSqft(draft.sqft);
             paintPanel();
           }
@@ -240,6 +262,7 @@
           'aria-label': 'Quote price',
           onblur: function (e) {
             draft.override = e.target.value === '' ? null : Number(e.target.value);
+            remember();
             editingPrice = false;
             paintPanel();
           },
@@ -379,7 +402,7 @@
       var c = calc();
       var quote = CF.actions.saveQuote(Object.assign(payload(c), { status: 'draft' }));
       if (status === 'sent') CF.actions.setQuoteStatus(quote.id, 'sent');
-      draft = null;
+      discardDraft();
       CF.ui.toast(status === 'sent' ? 'Quote saved and marked sent' : 'Quote saved');
       go('#/money/quote/' + quote.id);
     }
@@ -390,7 +413,7 @@
       var quote = CF.actions.saveQuote(Object.assign(payload(c), { status: 'sent' }));
       var result = CF.actions.acceptQuote(quote.id, { date: F.today() });
       if (!result) return;          // the write was refused; the toast explains why
-      draft = null;
+      discardDraft();
       CF.ui.toast('Quote accepted — job booked');
       go('#/jobs/' + result.job.id + '/edit');
     }
@@ -450,7 +473,7 @@
           quoteTax(quote) > 0
             ? el('div.right', [
                 el('div.meta', F.money(quote.price) + ' + ' +
-                  F.money(quoteTax(quote)) + ' ' + taxWord()),
+                  F.money(quoteTax(quote)) + ' ' + quoteTaxWord(quote)),
                 el('div.h-card', F.money(quote.price + quoteTax(quote)))
               ])
             : el('div.h-card', F.money(quote.price))
@@ -528,6 +551,7 @@
           ? 'Plus ' + taxWord() + ' ' + F.money(quoteTax(quote)) +
             ' — total ' + F.money(quote.price + quoteTax(quote))
           : null,
+
         Number(quote.sqft).toLocaleString() + ' sq ft · ' +
           F.plural(quote.beds, 'bed') + ' · ' + F.plural(quote.baths, 'bath'),
         'Frequency: ' + frequencyLabel(quote.frequency),
@@ -539,9 +563,32 @@
     }
   }
 
-  /** What this quote's tax comes to at today's rate — 0 when tax is off. */
+  /**
+   * The tax on this quote.
+   *
+   * While a quote is open, this is re-derived from the current rate: the client
+   * must see the number they will actually be invoiced, and the invoice is
+   * raised at the rate in force when the work is done.
+   *
+   * Once accepted, it is read back from the quote. That figure was frozen at
+   * acceptance, and it is what the client agreed to — changing the rate in
+   * Settings afterwards used to rewrite the total on a signed quote and on the
+   * "Copy as message" text, leaving it disagreeing with the invoice already
+   * raised against it.
+   */
   function quoteTax(quote) {
+    if (quote.status === 'accepted' && quote.tax !== undefined && quote.tax !== null) {
+      return Number(quote.tax) || 0;
+    }
     return CF.pricing.taxOn(Number(quote.price) || 0);
+  }
+
+  /** The label for the tax line — the rate that applied, once one is frozen. */
+  function quoteTaxWord(quote) {
+    if (quote.status === 'accepted' && quote.taxRateAtAccept) {
+      return taxWord() + ' at ' + quote.taxRateAtAccept + '%';
+    }
+    return taxWord();
   }
 
   function taxWord() {

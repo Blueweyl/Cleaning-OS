@@ -249,9 +249,12 @@
               el('button.btn.btn--quiet.btn--sm', {
                 type: 'button', onclick: function () { go('#/jobs/' + job.id + '/edit'); }
               }, 'Edit / Reschedule'),
-              el('button.btn.btn--quiet.btn--sm', {
+              // Not offered once the job is closed: the invoice has already been
+              // raised from these lines, so a charge added now would never
+              // reach the bill the client was given.
+              job.status !== 'completed' ? el('button.btn.btn--quiet.btn--sm', {
                 type: 'button', onclick: addCharge
-              }, 'Add Charge'),
+              }, 'Add Charge') : null,
               job.clientId ? el('button.btn.btn--quiet.btn--sm', {
                 type: 'button', onclick: function () { go('#/clients/' + job.clientId); }
               }, 'View Client') : null,
@@ -320,7 +323,7 @@
               onclick: function () {
                 var value = Number(amount);
                 if (!value || value <= 0) { CF.ui.toast('Enter an amount above zero', { tone: 'bad' }); return; }
-                CF.actions.addExtraCharge(job.id, label || 'Extra', value);
+                if (!CF.actions.addExtraCharge(job.id, label || 'Extra', value)) return;
                 close();
                 CF.ui.toast('Added ' + F.money(value), { undo: undoLast });
               }

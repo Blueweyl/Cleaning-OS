@@ -12,6 +12,16 @@
   var S  = function () { return CF.store; };
   var F  = function () { return CF.fmt; };
 
+  /**
+   * Say no out loud. A domain rule that refuses a write silently looks to the
+   * person tapping the button exactly like a bug, so every refusal below says
+   * why in the same place it returns null.
+   */
+  function warn(message) {
+    if (CF.ui && CF.ui.toast) CF.ui.toast(message, { tone: 'bad' });
+    return null;
+  }
+
   /* ---- Clients ----------------------------------------------------------- */
 
   var MAX_NAME = 120;
@@ -67,6 +77,23 @@
     var n = Number(value);
     if (!isFinite(n)) return fallback;
     return Math.min(max, Math.max(min, Math.round(n)));
+  }
+
+  /**
+   * A money amount we are willing to write down, or null when it is not one.
+   *
+   * `Number(x) || 0` was doing this job, and it let two things through that
+   * cost real accuracy: `Infinity` (which is not `|| 0`, so it survived and
+   * turned every total downstream into `$∞`), and negative numbers, which on
+   * an extra charge produced an invoice for minus four hundred dollars.
+   * Amounts are also rounded to whole cents here — a payment of 0.005 is not
+   * money, and storing it makes a balance that can never reach zero.
+   */
+  function money(value) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return null;
+    var cents = Math.round(n * 100) / 100;
+    return cents > 0 ? cents : null;
   }
 
   function clampSqft(value) {
@@ -179,11 +206,7 @@
    * job 1,800 years out where no list will ever show it.
    */
   function saneDate(key, fallback) {
-    var d = F().fromKey(key);
-    if (!d || isNaN(d.getTime())) return fallback;
-    var year = d.getFullYear();
-    if (year < 2000 || year > 2100) return fallback;
-    return F().toKey(d);
+    return F().safeDateKey(key, fallback);
   }
 
   function bookJob(data) {
@@ -226,11 +249,34 @@
       .filter(Boolean).join(' ');
   }
 
+  /**
+   * The only states a clean can move between. Everything else is a
+   * double-tap, a stale screen or a hand-edited file, and is refused here so
+   * the UI is not the only thing holding the workflow together.
+   *
+   *   scheduled  → in_progress → completed
+   *              ↘ cancelled  ↙
+   *
+   * `completed` and `cancelled` are terminal: a completed job owns an invoice
+   * and a cancelled one does not, so reopening either leaves the books and the
+   * schedule disagreeing about what happened.
+   */
   function startJob(id) {
     var job = S().find('jobs', id);
-    // Reopening a completed job would leave it in_progress while still carrying
-    // a completedDate and a raised invoice — counted as done and as running.
-    if (!job || job.status === 'completed') return job || null;
+    if (!job) return null;
+    if (job.status === 'completed') {
+      return warn('That job is already finished');
+    }
+    if (job.status === 'cancelled') {
+      // Starting a cancelled job put it back on the clock while every list
+      // still treated it as called off.
+      return warn('That job was cancelled — rebook it to clean it');
+    }
+    // Already running: tapping START a second time (a double-tap, or a stale
+    // job screen) used to reset startedAt and throw away every second worked
+    // since the first tap. Leave the running clock exactly as it is.
+    if (job.status === 'in_progress' && job.startedAt) return job;
+
     return S().update('jobs', id, {
       status: 'in_progress',
       startedAt: new Date().toISOString()
@@ -245,7 +291,19 @@
     return S().update('jobs', id, { startedAt: null, elapsedSeconds: elapsed }, 'Pause timer');
   }
 
+  /**
+   * Restart a paused clock. This had no guard at all, so it would put a
+   * running timer on a cancelled job, or on a completed one that already had
+   * its invoice raised — and resuming a job that was *already* running reset
+   * the clock, silently discarding the time worked since it started.
+   */
   function resumeJob(id) {
+    var job = S().find('jobs', id);
+    if (!job) return null;
+    if (job.status === 'completed') return warn('That job is already finished');
+    if (job.status === 'cancelled') return warn('That job was cancelled');
+    if (job.status !== 'in_progress') return startJob(id);
+    if (job.startedAt) return job;      // already running; don't reset the clock
     return S().update('jobs', id, { startedAt: new Date().toISOString() }, 'Resume timer');
   }
 
@@ -279,11 +337,33 @@
     return S().update('jobs', jobId, { checklist: next }, 'Checklist', null);
   }
 
+  /**
+   * An extra on top of the agreed price — the fridge, the oven, the garage.
+   *
+   * Validated here rather than only in the modal: a negative amount used to be
+   * accepted, and because the invoice is the sum of its lines, one -500 extra
+   * raised an invoice for -$400. The label is tidied for the same reason
+   * client names are — it goes into an invoice line and a CSV column, and a
+   * pasted cell arrived with tabs, newlines and 300 characters of it.
+   */
   function addExtraCharge(jobId, label, amount) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
+    if (job.status === 'completed') {
+      // The invoice is already raised from these lines; adding to them now
+      // would change a total the client has been given.
+      warn('That job is closed — add this to the invoice instead');
+      return null;
+    }
+    var value = money(amount);
+    if (value === null) {
+      warn('Enter a charge above zero');
+      return null;
+    }
     var extras = (job.extras || []).concat([{
-      id: S().uid('ex'), label: label || 'Extra', amount: Number(amount) || 0
+      id: S().uid('ex'),
+      label: tidyLine(label, MAX_NAME) || 'Extra',
+      amount: value
     }]);
     return S().update('jobs', jobId, { extras: extras }, 'Add charge');
   }
@@ -434,7 +514,8 @@
     if (!job) return null;
     // A completed job has an invoice against it. Cancelling the job would
     // leave that invoice live and payable with nothing to explain it.
-    if (job.status === 'completed') return job;
+    if (job.status === 'completed') return warn('That job is finished — it cannot be cancelled');
+    if (job.status === 'cancelled') return job;   // already called off
     return S().update('jobs', jobId, { status: 'cancelled' }, 'Cancel job', {
       icon: '🚫', text: 'Cancelled job for ' + CF.q.clientName(job.clientId, job.clientName)
     });
@@ -481,17 +562,48 @@
     return invoice;
   }
 
+  /**
+   * Money in against an invoice.
+   *
+   * Every rule here used to live only in the payment modal, which meant a
+   * restored backup, a second tab or a mistyped date could put a figure in the
+   * ledger that the modal would have refused:
+   *
+   *  - `Infinity` passed the old `<= 0` check and made every total `$∞`.
+   *  - Overpayment was a UI check against a captured balance, so two payments
+   *    recorded from two tabs could both pass and take the invoice past its
+   *    total with nothing on screen to explain it.
+   *  - A malformed date was stored verbatim. It still counted on the invoice,
+   *    but `paymentsIn` buckets by month and silently dropped it — the invoice
+   *    read paid while Money said the money never arrived.
+   */
   function recordPayment(invoiceId, amount, method, date) {
     var inv = S().find('invoices', invoiceId);
     if (!inv) return null;
-    var value = Number(amount) || 0;
-    if (value <= 0) return null;
+
+    var value = money(amount);
+    if (value === null) {
+      warn('Enter an amount above zero');
+      return null;
+    }
+
+    // Re-read the balance from the invoice as it is right now, not from
+    // whatever the screen was showing when the modal opened.
+    var remaining = CF.q.invoiceRemaining(inv);
+    if (value > remaining + 0.005) {
+      warn(remaining > 0
+        ? 'That is more than the ' + F().money(remaining) + ' still owed'
+        : 'That invoice is already paid in full');
+      return null;
+    }
+
+    var when = F().safeDateKey(date, F().today());
 
     var payments = (inv.payments || []).concat([{
       id: S().uid('pay'),
       amount: value,
       method: method || 'Cash',
-      date: date || F().today()
+      date: when
     }]);
 
     var updated = S().update('invoices', invoiceId, { payments: payments },
@@ -549,9 +661,28 @@
   function acceptQuote(quoteId, bookingDetails) {
     var quote = S().find('quotes', quoteId);
     if (!quote) return null;
+
+    // Accepting twice is the same decision twice, not two bookings. A
+    // double-tap on "Accepted → Book Job" used to create a second client and a
+    // second job every time — three taps, three cleans on the calendar for one
+    // agreed price. Hand back what the first acceptance produced instead.
+    if (quote.status === 'accepted') {
+      var booked = existingJobForQuote(quote.id);
+      if (booked) return { clientId: quote.clientId, job: booked, alreadyAccepted: true };
+      // Accepted but its job is gone (deleted, or an older file): fall through
+      // and book the work again rather than leaving the quote with nothing.
+    }
+
     return S().transaction('Accept quote', function () {
       return doAcceptQuote(quote, bookingDetails);
     });
+  }
+
+  /** The job this quote was turned into, if it still exists. */
+  function existingJobForQuote(quoteId) {
+    return S().all('jobs').filter(function (j) {
+      return j.quoteId === quoteId && j.status !== 'cancelled';
+    })[0] || null;
   }
 
   function doAcceptQuote(quote, bookingDetails) {
@@ -570,7 +701,21 @@
       S().update('quotes', quoteId, { clientId: clientId }, 'Link quote to client');
     }
 
-    S().update('quotes', quoteId, { status: 'accepted' }, 'Accept quote');
+    // Freeze the money at the moment it was agreed. The quote screen shows a
+    // live tax figure while a quote is still open — right, because that is what
+    // the client will be invoiced — but once accepted these are the numbers
+    // both sides shook hands on, and a later Settings change must not rewrite
+    // them. `taxRateAtAccept` is kept so the document can show the rate that
+    // applied, not today's.
+    var agreedTax = CF.pricing.taxOn(Number(quote.price) || 0);
+    S().update('quotes', quoteId, {
+      status: 'accepted',
+      acceptedAt: new Date().toISOString(),
+      tax: agreedTax,
+      total: Math.round(((Number(quote.price) || 0) + agreedTax) * 100) / 100,
+      taxRateAtAccept: CF.pricing.taxRate(),
+      taxEnabledAtAccept: !!S().get().settings.taxEnabled
+    }, 'Accept quote');
 
     var job = bookJob(Object.assign({
       clientId: clientId,

@@ -92,7 +92,40 @@ keyboard, with a screen reader, and at 200% text zoom without breaking.
 
 **Grow only shows real opportunities.** A client appears under "ready to rebook"
 because their actual cleaning interval has lapsed with nothing booked ahead, not
-because a counter ticked over.
+because a counter ticked over. The money figures on that screen are always
+labelled **potential** and **estimated, not booked** — they're work worth
+chasing, not income. What actually came in is the MONEY tab, and only there.
+
+**An accepted price stays the price you agreed.** While a quote is still open,
+the tax shown updates with your current rate, so what you send is always what
+you'd invoice. The moment you mark it accepted, the price, tax and total are
+frozen — and the document notes the rate that applied (*"Sales tax at 8.25%"*).
+Change your rate in Settings afterwards and old accepted quotes are untouched,
+so a signed quote can never disagree with the invoice raised against it. Raised
+invoices and booked jobs are frozen the same way: changing a service price or
+tax rate never rewrites money you've already agreed or billed.
+
+**Money can only go in once, and only what's owed.** A payment has to be a real
+amount above zero and can't exceed what's still outstanding — checked when it's
+saved, not just in the box you typed it in, so two open tabs can't both record
+the same final payment. If a payment date is missing or malformed it's recorded
+as today rather than stored as-is, because a nonsense date would sit on the
+invoice while vanishing from every monthly total. Extra charges follow the same
+rules, and can't be added to a job that's already closed — its invoice has gone
+out.
+
+**Tapping twice never books twice.** Accepting a quote creates one client and
+one job however many times the button is pressed; press it again later and
+CleanFlow takes you back to the booking it already made. Tapping START on a
+clean that's already running leaves the clock alone instead of resetting it, and
+a cancelled or finished job can't be quietly restarted.
+
+**Half-typed work is kept.** The Smart Quote and the Commercial Proposal both
+remember what you've typed as you go, so a refresh, an accidental back-swipe, or
+closing the tab after printing doesn't throw it away — reopen the screen and it's
+still there. Clearing a proposal asks first. These working drafts are kept
+separately from your records: they never show up in a backup, and they're gone
+once you save.
 
 ---
 

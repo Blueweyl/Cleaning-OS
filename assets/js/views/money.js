@@ -518,7 +518,10 @@
                   amountField.setError('That is more than the ' + F.money(remaining) + ' outstanding.');
                   return;
                 }
-                CF.actions.recordPayment(inv.id, value, method);
+                // The domain layer re-checks the balance against the invoice
+                // as it stands now, so it can still refuse what this modal
+                // thought was fine — a second tab, or a stale screen.
+                if (!CF.actions.recordPayment(inv.id, value, method)) return;
                 close();
                 var nowPaid = Q.invoiceRemaining(CF.store.find('invoices', inv.id)) <= 0.001;
                 if (nowPaid) {

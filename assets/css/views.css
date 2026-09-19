@@ -136,6 +136,8 @@
 .opp__title { font-size: 15px; font-weight: 800; }
 .opp__revenue { font-size: 13px; color: var(--text-muted); margin-top: var(--s-2); }
 .opp__revenue b { color: var(--ok-text); font-weight: 800; }
+/* Quietly but permanently attached to the figure: it is an estimate. */
+.opp__revenue-note { color: var(--text-faint); font-weight: 600; }
 .opp__why { font-size: var(--t-sm); color: var(--text-faint);
             margin-top: 6px; line-height: 1.5; }
 .opp__item { padding: var(--s-3); background: var(--surface-sunken);
