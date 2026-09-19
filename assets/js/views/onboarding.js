@@ -12,6 +12,20 @@
   var step = 0;
   var draft = null;
 
+  /**
+   * A base price typed during setup.
+   *
+   * This used `Number(v) || 0`, which lets a negative through unchanged and
+   * turns 1e999 into Infinity — and it is the first price a buyer ever enters,
+   * so every job booked against that service inherited it. The same guard the
+   * Settings service editor uses.
+   */
+  function servicePrice(v) {
+    var n = Number(v);
+    if (!isFinite(n) || n < 0) return 0;
+    return Math.min(n, 10000000);
+  }
+
   function reset() {
     step = 0;
     draft = {
@@ -178,7 +192,7 @@
           value: draft.prices[s.id],
           prefix: symbolFor(draft.currency),
           hint: 'Your starting price for a typical job.',
-          onInput: function (v) { draft.prices[s.id] = Number(v) || 0; }
+          onInput: function (v) { draft.prices[s.id] = servicePrice(v); }
         }).node;
       }).concat([
         el('p.meta', 'You can fine-tune everything later in Settings → Services & Pricing.')
@@ -239,7 +253,9 @@
       d.services = d.services.map(function (s) {
         return Object.assign({}, s, {
           active: !!draft.services[s.id],
-          basePrice: draft.prices[s.id] !== undefined ? draft.prices[s.id] : s.basePrice
+          basePrice: draft.prices[s.id] !== undefined
+            ? servicePrice(draft.prices[s.id])
+            : s.basePrice
         });
       });
     }, { noUndo: true });

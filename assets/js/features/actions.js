@@ -298,6 +298,20 @@
     if (!job.checklist || !job.checklist.length) job.checklist = checklistFor(job.serviceId);
     job.date = saneDate(job.date, F().today());
 
+    // The defaults above resolve the client and service, but `data` is the last
+    // argument to Object.assign, so a raw id in the input overwrote the resolved
+    // one and that resolution never applied. A job could be booked against a
+    // client or service id that does not exist. The names are kept — they are
+    // what the job was booked as — and a dangling id is dropped.
+    if (job.clientId && !client) {
+      job.clientName = job.clientName || '';
+      job.clientId = null;
+    }
+    if (job.serviceId && !S().find('services', job.serviceId)) {
+      job.serviceName = job.serviceName || (svc ? svc.name : '');
+      job.serviceId = svc ? svc.id : null;
+    }
+
     // Every other money action validates its amount; this one took whatever it
     // was handed. A service saved with a base price of -50 booked jobs at -$50,
     // which the dashboard then showed as "Standard Cleaning -$50", and Infinity

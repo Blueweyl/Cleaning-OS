@@ -206,9 +206,10 @@ falling back to the default while the screen still reads "0 days". Day counts ha
 sensible upper limits, so a mistyped figure can't produce an invoice due date that
 isn't a date.
 
-**A job can't be booked for a negative amount.** A service saved with an odd base
-price, or a figure arriving from an edited file, is floored at zero and capped
-rather than turning up on your dashboard as "-$50".
+**A job can't be booked for a negative amount**, and neither can a base price you
+set during setup or in Settings. Anything odd — a stray minus sign, or a figure
+arriving from an edited file — is floored at zero and capped, rather than turning
+up on your dashboard as "-$50".
 
 **A tax rate outside 0–100 can't be saved.** Your current rate is kept until you
 enter a valid one, so a mistyped rate can never quietly turn into charging no tax
