@@ -227,15 +227,17 @@
 
   function jobTotal(job) {
     if (!job) return 0;
-    var extras = (job.extras || []).reduce(function (a, e) {
+    var extras = (Array.isArray(job.extras) ? job.extras : []).reduce(function (a, e) {
       return a + (Number(e.amount) || 0);
     }, 0);
     return (Number(job.price) || 0) + extras;
   }
 
   function checklistProgress(job) {
-    var items = (job && job.checklist) || [];
-    var done = items.filter(function (i) { return i.done; }).length;
+    // Must be a list: a stored `checklist: "done"` would report a length of 4
+    // from the string and then throw on filter.
+    var items = (job && Array.isArray(job.checklist)) ? job.checklist : [];
+    var done = items.filter(function (i) { return i && i.done; }).length;
     return {
       done: done,
       total: items.length,
@@ -248,15 +250,21 @@
 
   function invoices() { return S().all('invoices'); }
 
+  /** Money received against an invoice. Never negative, never non-finite. */
   function invoiceReceived(inv) {
     if (!inv) return 0;
-    return (inv.payments || []).reduce(function (a, p) {
-      return a + (Number(p.amount) || 0);
+    var list = Array.isArray(inv.payments) ? inv.payments : [];
+    var sum = list.reduce(function (a, p) {
+      var n = Number(p && p.amount);
+      return a + (isFinite(n) && n > 0 ? n : 0);
     }, 0);
+    return isFinite(sum) ? Math.round(sum * 100) / 100 : 0;
   }
 
   function invoiceRemaining(inv) {
-    return Math.max(0, (Number(inv.total) || 0) - invoiceReceived(inv));
+    var total = Number(inv && inv.total);
+    if (!isFinite(total) || total < 0) total = 0;
+    return Math.round(Math.max(0, total - invoiceReceived(inv)) * 100) / 100;
   }
 
   /**
@@ -356,10 +364,13 @@
   function paymentsIn(from, to) {
     var out = [];
     invoices().forEach(function (inv) {
-      (inv.payments || []).forEach(function (p) {
-        if (inRange(p.date, from, to)) {
+      // A restored or hand-edited file can hold anything here. `payments`
+      // arriving as a string used to throw and take the Money screen with it.
+      var list = Array.isArray(inv.payments) ? inv.payments : [];
+      list.forEach(function (p) {
+        if (p && typeof p === 'object' && inRange(p.date, from, to)) {
           out.push({
-            id: p.id, date: p.date, amount: Number(p.amount) || 0,
+            id: p.id, date: p.date, amount: safeAmount(p.amount),
             method: p.method, invoiceId: inv.id,
             invoiceNumber: inv.number,
             clientId: inv.clientId,
@@ -387,7 +398,16 @@
     return Math.round(amount * (tax / total) * 100) / 100;
   }
 
-  function cents(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  function cents(n) {
+    var v = Number(n);
+    return isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  /** A stored amount read for display or totalling: finite and not negative. */
+  function safeAmount(value) {
+    var n = Number(value);
+    return isFinite(n) && n > 0 ? n : 0;
+  }
 
   function summary(from, to) {
     var pays = paymentsIn(from, to);
@@ -399,8 +419,10 @@
     var taxCollected = pays.reduce(function (a, p) { return a + (p.taxShare || 0); }, 0);
     var revenue = cents(collected - taxCollected);
 
-    var spend = expenses().filter(function (e) { return inRange(e.date, from, to); })
-      .reduce(function (a, e) { return a + (Number(e.amount) || 0); }, 0);
+    // One expense of Infinity used to make this — and therefore profit, and
+    // therefore every figure on the Money screen — non-finite.
+    var spend = expenses().filter(function (e) { return e && inRange(e.date, from, to); })
+      .reduce(function (a, e) { return a + safeAmount(e.amount); }, 0);
 
     var jobsDone = jobs().filter(function (j) {
       return j.status === 'completed' && inRange(j.completedDate || j.date, from, to);

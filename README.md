@@ -108,6 +108,34 @@ accepted before this version are covered too: the rate each one was agreed at is
 worked out from the figures already saved with it, so no total changes — they
 just stop being able to drift.
 
+**The invoice bills the rate you agreed, not the rate today.** If a client
+accepts a quote at 5% and you raise your rate to 10% before the clean happens,
+their invoice still charges 5% — and it says so on the line (*"VAT at 5%"*), so
+the figure never looks like a mistake. Work booked without a quote uses your
+current rate, as you'd expect.
+
+**A finished job is a record, not a draft.** Once you close a job, its charges
+and its checklist are fixed: the invoice was built from them and the client has
+it, so unticking an item or removing a charge afterwards would leave your books
+and their bill describing different work. A cancelled job can't be charged for
+or ticked off either. Add anything late to the invoice instead.
+
+**Expenses are checked like everything else.** An amount has to be above zero and
+a real number; dates and categories are validated, and your own category wording
+is kept if you don't use one of the listed ones. This matters more than it
+sounds: a single unchecked expense used to be able to make your whole profit
+figure unreadable.
+
+**A restored backup can't poison your books.** Files get edited, truncated,
+copied between devices and synced by other apps. On restore, CleanFlow checks the
+shape of every financial record before anything is shown: a payment list that
+isn't a list, a total that isn't a number, a date that isn't a date. Figures that
+*are* readable are left exactly as they are — your records are yours — but
+anything unreadable is repaired rather than being allowed to turn your revenue,
+tax or profit into a blank. And a backup holding a real business is always
+recognised as one, so a restore never drops you back to the welcome screen with
+your work hidden behind it.
+
 **Money can only go in once, and only what's owed.** A payment has to be a real
 amount above zero and can't exceed what's still outstanding — checked when it's
 saved, not just in the box you typed it in, so two open tabs can't both record

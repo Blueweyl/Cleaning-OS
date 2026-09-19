@@ -306,10 +306,135 @@
     if (!out.checklists.length) out.checklists = defaultChecklists();
     if (!out.templates.length)  out.templates = defaultTemplates();
 
+    repairFinancials(out);
     freezeAcceptedQuotes(out);
+    recogniseExistingBusiness(out);
 
     out.schemaVersion = SCHEMA_VERSION;
     return out;
+  }
+
+  /**
+   * A restored file holding a real business is not a first run.
+   *
+   * The welcome screen shows whenever `onboarded` is false. A file that never
+   * carried the flag — a backup taken before setup finished, an older export, a
+   * hand-edited or truncated file — therefore restored *successfully* and then
+   * hid everything behind "Welcome to CleanFlow", which to the person who just
+   * restored it is indistinguishable from having lost the lot.
+   *
+   * Evidence of a real business is a named business or any record of work. That
+   * is inferred, not invented: nothing is added to the file, and a genuinely
+   * empty first-run file still gets the welcome it should.
+   */
+  function recogniseExistingBusiness(out) {
+    if (out.settings.onboarded) return;
+    var hasWork = ['clients', 'jobs', 'invoices', 'quotes', 'expenses'].some(function (k) {
+      return (out[k] || []).length > 0;
+    });
+    var named = !!(out.business && String(out.business.name || '').trim());
+    if (hasWork || named) out.settings.onboarded = true;
+  }
+
+  /**
+   * Make the money in a restored file safe to read.
+   *
+   * Everything downstream — totals, revenue, profit, the outstanding figure —
+   * assumes these fields are numbers and that `payments` is a list. A file that
+   * broke either assumption took the whole Money screen with it: `payments`
+   * holding a string threw on the first `.forEach`, and one expense of
+   * `Infinity` made the month's expenses *and* profit non-finite, so every
+   * figure on screen read as nothing.
+   *
+   * This repairs shapes, not amounts. A value that is already a finite number
+   * is the owner's record and is left exactly as it is, even where it looks
+   * odd — only what cannot be read as money at all is replaced, and a negative
+   * amount is floored at zero because no screen can render a negative bill
+   * sensibly. Nothing here rewrites a figure that was readable.
+   */
+  function repairFinancials(out) {
+    var CAP = 10000000;
+
+    function amount(value, fallback) {
+      var n = Number(value);
+      if (!isFinite(n)) return fallback;
+      if (n < 0) return 0;
+      return Math.round(Math.min(n, CAP) * 100) / 100;
+    }
+    function text(value, max) {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'object') return '';
+      return String(value).replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .replace(/\s+/g, ' ').trim().slice(0, max || 120);
+    }
+    // schema.js has no date helpers of its own; migrate always runs well after
+    // every core script has loaded, so CF.fmt is available here.
+    function dateOrNull(value) {
+      return CF.fmt.isDateKey(value) ? String(value) : null;
+    }
+    function today() { return CF.fmt.today(); }
+
+    (out.invoices || []).forEach(function (inv) {
+      if (!inv || typeof inv !== 'object') return;
+
+      // `payments` must be a list. A string here was a hard crash.
+      if (!Array.isArray(inv.payments)) inv.payments = [];
+      inv.payments = inv.payments.filter(function (pay) {
+        return pay && typeof pay === 'object' && !Array.isArray(pay);
+      }).map(function (pay) {
+        return {
+          id: text(pay.id, 60) || ('pay-' + Math.random().toString(36).slice(2, 9)),
+          amount: amount(pay.amount, 0),
+          method: text(pay.method, 40) || 'Cash',
+          date: dateOrNull(pay.date) || dateOrNull(inv.issueDate) || today()
+        };
+      }).filter(function (pay) { return pay.amount > 0; });
+
+      if (!Array.isArray(inv.lines)) inv.lines = [];
+      inv.lines = inv.lines.filter(function (l) {
+        return l && typeof l === 'object' && !Array.isArray(l);
+      }).map(function (l) {
+        return { label: text(l.label, 120) || 'Cleaning', amount: amount(l.amount, 0) };
+      });
+
+      var linesTotal = inv.lines.reduce(function (a, l) { return a + l.amount; }, 0);
+      inv.subtotal = amount(inv.subtotal, Math.round(linesTotal * 100) / 100);
+      inv.tax = amount(inv.tax, 0);
+      inv.total = amount(inv.total, Math.round((inv.subtotal + inv.tax) * 100) / 100);
+      inv.issueDate = dateOrNull(inv.issueDate) || today();
+      inv.dueDate = dateOrNull(inv.dueDate) || inv.issueDate;
+    });
+
+    (out.expenses || []).forEach(function (e) {
+      if (!e || typeof e !== 'object') return;
+      e.amount = amount(e.amount, 0);
+      e.category = text(e.category, 40) || 'Other';
+      e.note = text(e.note, 2000);
+      e.date = dateOrNull(e.date) || today();
+    });
+
+    (out.jobs || []).forEach(function (j) {
+      if (!j || typeof j !== 'object') return;
+      j.price = amount(j.price, 0);
+      if (!Array.isArray(j.extras)) j.extras = [];
+      j.extras = j.extras.filter(function (x) {
+        return x && typeof x === 'object' && !Array.isArray(x);
+      }).map(function (x) {
+        return {
+          id: text(x.id, 60) || ('ex-' + Math.random().toString(36).slice(2, 9)),
+          label: text(x.label, 120) || 'Extra',
+          amount: amount(x.amount, 0)
+        };
+      });
+      if (!Array.isArray(j.checklist)) j.checklist = [];
+    });
+
+    (out.quotes || []).forEach(function (q) {
+      if (!q || typeof q !== 'object') return;
+      q.price = amount(q.price, 0);
+      if (q.tax !== undefined) q.tax = amount(q.tax, 0);
+      if (q.total !== undefined) q.total = amount(q.total, q.price + (Number(q.tax) || 0));
+    });
   }
 
   /**

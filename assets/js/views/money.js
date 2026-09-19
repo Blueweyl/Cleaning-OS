@@ -370,10 +370,13 @@
                 amountField.input.focus();
                 return;
               }
-              CF.actions.addExpense({
+              // The domain layer validates the date and category too, so it can
+              // still refuse. Closing regardless would toast "Expense saved"
+              // and offer an Undo that took back the previous action instead.
+              if (!CF.actions.addExpense({
                 amount: value, category: draft.category,
                 note: draft.note, date: draft.date
-              });
+              })) return;
               close();
               CF.ui.toast('Expense saved', {
                 undo: function () { CF.store.undo(); CF.shell.repaint(); }
@@ -437,7 +440,14 @@
 
         el('div.deflist.mt-4', [
           inv.tax ? U.defRow('Subtotal', F.money(inv.subtotal)) : null,
-          inv.tax ? U.defRow(CF.store.get().settings.taxLabel || 'Tax', F.money(inv.tax)) : null,
+          // The rate is named because it can legitimately differ from Settings:
+          // an invoice raised against an accepted quote is billed at the rate
+          // agreed then, so without this the figure looks like a mistake.
+          inv.tax ? U.defRow(
+            (CF.store.get().settings.taxLabel || 'Tax') +
+              (isFinite(Number(inv.taxRate)) && Number(inv.taxRate) > 0
+                ? ' at ' + Number(inv.taxRate) + '%' : ''),
+            F.money(inv.tax)) : null,
           U.defRow('Invoice total', F.money(inv.total)),
           U.defRow('Received', F.money(received)),
           over > 0 ? U.defRow('Overpaid', F.money(over), true) : null,

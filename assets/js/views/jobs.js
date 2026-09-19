@@ -435,12 +435,13 @@
             progress.percent + '%')
         ]),
         el('div.mb-5', U.progress(progress.percent)),
-        el('div.stack', (job.checklist || []).map(function (item) {
+        el('div.stack', (Array.isArray(job.checklist) ? job.checklist : []).map(function (item) {
           return el('button.checklist__item', {
             type: 'button',
             'aria-pressed': item.done ? 'true' : 'false',
             onclick: function () {
-              CF.actions.toggleChecklistItem(job.id, item.id);
+              // Refused once the job is closed; don't repaint over the reason.
+              if (!CF.actions.toggleChecklistItem(job.id, item.id)) return;
               CF.shell.repaint();
             }
           }, [

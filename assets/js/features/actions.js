@@ -89,11 +89,71 @@
    * Amounts are also rounded to whole cents here — a payment of 0.005 is not
    * money, and storing it makes a balance that can never reach zero.
    */
+  var MAX_AMOUNT = 10000000;
+
   function money(value) {
     var n = Number(value);
     if (!isFinite(n) || n <= 0) return null;
-    var cents = Math.round(n * 100) / 100;
+    var cents = Math.round(Math.min(n, MAX_AMOUNT) * 100) / 100;
     return cents > 0 ? cents : null;
+  }
+
+  /**
+   * An amount read back from a stored record: never negative, never infinite.
+   *
+   * Used where the value is already in the database rather than being typed.
+   * A restored file carried a job priced at -800 and one at 1e308; both reached
+   * an invoice, one billing minus eight hundred and eighty dollars and the
+   * other overflowing its total to Infinity — which `outstandingTotal` then
+   * spread across the whole Money screen.
+   */
+  /**
+   * A stored list, guaranteed to be one.
+   *
+   * `(job.extras || [])` looks safe and is not: a restored or hand-edited file
+   * holding `extras: "none"` sails past the `||` and throws on `.map`, which
+   * took down invoice creation mid-transaction. `migrate` repairs these on
+   * restore, but the domain layer must not assume it was the only way in.
+   */
+  function asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function storedAmount(value) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.round(Math.min(n, MAX_AMOUNT) * 100) / 100;
+  }
+
+  /**
+   * One of the methods we offer, matched however it was typed or restored, or
+   * the owner's own wording kept as a short clean label. Never an object, a
+   * number or something with a tab in it — this lands in a CSV column.
+   */
+  function paymentMethod(value) {
+    if (value === null || value === undefined) return 'Cash';
+    if (typeof value === 'object') return 'Cash';
+    var raw = tidyLine(value, 40);
+    if (!raw) return 'Cash';
+    var known = null;
+    CF.schema.PAYMENT_METHODS.forEach(function (m) {
+      if (m.toLowerCase() === raw.toLowerCase()) known = m;
+    });
+    // Not one of ours, but a buyer may genuinely be paid another way; keep
+    // their wording rather than relabelling their money.
+    return known || raw;
+  }
+
+  /** One of the expense categories, matched loosely, or the owner's own word. */
+  function expenseCategory(value) {
+    if (value === null || value === undefined || typeof value === 'object') return 'Other';
+    var raw = tidyLine(value, 40);
+    if (!raw) return 'Other';
+    var known = null;
+    CF.schema.EXPENSE_CATEGORIES.forEach(function (c) {
+      if (c.toLowerCase() === raw.toLowerCase()) known = c;
+    });
+    return known || raw;
   }
 
   function clampSqft(value) {
@@ -328,10 +388,22 @@
     return elapsedSeconds(job) > IMPLAUSIBLE_SECONDS;
   }
 
+  /**
+   * The record of what was actually cleaned.
+   *
+   * Once a job is closed this is history: the invoice has been raised from it
+   * and sent. Unticking an item afterwards left the job claiming work was not
+   * done while the client held a bill saying it was. A cancelled job was never
+   * worked at all, so it has nothing to tick.
+   */
   function toggleChecklistItem(jobId, itemId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
-    var next = (job.checklist || []).map(function (i) {
+    if (job.status === 'completed') {
+      return warn('That job is finished — its checklist is part of your records now');
+    }
+    if (job.status === 'cancelled') return warn('That job was cancelled');
+    var next = asArray(job.checklist).map(function (i) {
       return i.id === itemId ? Object.assign({}, i, { done: !i.done }) : i;
     });
     return S().update('jobs', jobId, { checklist: next }, 'Checklist', null);
@@ -352,15 +424,17 @@
     if (job.status === 'completed') {
       // The invoice is already raised from these lines; adding to them now
       // would change a total the client has been given.
-      warn('That job is closed — add this to the invoice instead');
-      return null;
+      return warn('That job is closed — add this to the invoice instead');
+    }
+    if (job.status === 'cancelled') {
+      return warn('That job was cancelled — there is nothing to charge for');
     }
     var value = money(amount);
     if (value === null) {
       warn('Enter a charge above zero');
       return null;
     }
-    var extras = (job.extras || []).concat([{
+    var extras = asArray(job.extras).concat([{
       id: S().uid('ex'),
       label: tidyLine(label, MAX_NAME) || 'Extra',
       amount: value
@@ -371,8 +445,13 @@
   function removeExtraCharge(jobId, extraId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
+    if (job.status === 'completed') {
+      // The invoice was built from these lines and the client has it. Dropping
+      // one now left the job and the bill describing different work.
+      return warn('That job is closed — its charges are on an invoice already');
+    }
     return S().update('jobs', jobId, {
-      extras: (job.extras || []).filter(function (e) { return e.id !== extraId; })
+      extras: asArray(job.extras).filter(function (e) { return e && e.id !== extraId; })
     }, 'Remove charge');
   }
 
@@ -523,21 +602,53 @@
 
   /* ---- Invoices ------------------------------------------------------------ */
 
+  /**
+   * The tax rate this job's invoice must be billed at.
+   *
+   * Normally the rate in force today. But when the job came from a quote the
+   * client accepted, the rate agreed then is the rate that applies — otherwise
+   * raising the rate in Settings between acceptance and the clean silently
+   * billed more than was agreed. A quote accepted at 5% and completed after a
+   * change to 10% was invoiced $440 against an agreed $420.
+   *
+   * Returns null when there is no agreement to honour, meaning "use today's".
+   */
+  function agreedTaxRate(job) {
+    if (!job || !job.quoteId) return null;
+    var quote = S().find('quotes', job.quoteId);
+    if (!quote || quote.status !== 'accepted') return null;
+    if (quote.taxEnabledAtAccept === false) return 0;
+    var rate = Number(quote.taxRateAtAccept);
+    if (!isFinite(rate) || rate < 0) return null;
+    return Math.min(rate, 100);
+  }
+
   function createInvoiceForJob(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
     if (job.invoiceId) return S().find('invoices', job.invoiceId);
 
     var s = S().get().settings;
+    // Amounts come out of stored records, which a restore or a hand-edit can
+    // have filled with anything. A negative or infinite line is not a bill.
     var lines = [{
-      label: job.serviceName || CF.q.serviceName(job.serviceId),
-      amount: Number(job.price) || 0
-    }].concat((job.extras || []).map(function (e) {
-      return { label: e.label, amount: Number(e.amount) || 0 };
+      label: tidyLine(job.serviceName || CF.q.serviceName(job.serviceId), MAX_NAME) || 'Cleaning',
+      amount: storedAmount(job.price)
+    }].concat(asArray(job.extras).map(function (e) {
+      return {
+        label: tidyLine(e && e.label, MAX_NAME) || 'Extra',
+        amount: storedAmount(e && e.amount)
+      };
     }));
 
-    var subtotal = lines.reduce(function (a, l) { return a + l.amount; }, 0);
-    var tax = CF.pricing.taxOn(subtotal);
+    var subtotal = storedAmount(lines.reduce(function (a, l) { return a + l.amount; }, 0));
+
+    // Honour the rate agreed with the client where there is one.
+    var agreed = agreedTaxRate(job);
+    var tax = agreed === null
+      ? CF.pricing.taxOn(subtotal)
+      : Math.round(subtotal * agreed) / 100;
+    if (!isFinite(tax) || tax < 0) tax = 0;
 
     var invoice = S().insert('invoices', {
       number: S().nextNumber('invoice'),
@@ -547,6 +658,10 @@
       lines: lines,
       subtotal: subtotal,
       tax: tax,
+      // Recorded so the invoice can say what rate it was billed at, and so a
+      // later Settings change is visibly not what this bill used.
+      taxRate: agreed === null ? CF.pricing.taxRate() : agreed,
+      taxAgreedAtQuote: agreed !== null,
       total: Math.round((subtotal + tax) * 100) / 100,
       issueDate: F().today(),
       dueDate: F().addDays(F().today(), s.invoiceTermsDays || 14),
@@ -555,7 +670,7 @@
     }, 'Create invoice', {
       icon: '🧾',
       text: 'Invoice raised for ' + (job.clientName || CF.q.clientName(job.clientId)) +
-            ' — ' + F().money(subtotal + tax)
+            ' — ' + F().money(Math.round((subtotal + tax) * 100) / 100)
     });
 
     S().update('jobs', jobId, { invoiceId: invoice.id }, 'Link invoice');
@@ -599,10 +714,10 @@
 
     var when = F().safeDateKey(date, F().today());
 
-    var payments = (inv.payments || []).concat([{
+    var payments = asArray(inv.payments).concat([{
       id: S().uid('pay'),
       amount: value,
-      method: method || 'Cash',
+      method: paymentMethod(method),
       date: when
     }]);
 
@@ -620,7 +735,7 @@
     var inv = S().find('invoices', invoiceId);
     if (!inv) return null;
     return S().update('invoices', invoiceId, {
-      payments: (inv.payments || []).filter(function (p) { return p.id !== paymentId; })
+      payments: asArray(inv.payments).filter(function (p) { return p && p.id !== paymentId; })
     }, 'Remove payment');
   }
 
@@ -707,15 +822,21 @@
     // both sides shook hands on, and a later Settings change must not rewrite
     // them. `taxRateAtAccept` is kept so the document can show the rate that
     // applied, not today's.
-    var agreedTax = CF.pricing.taxOn(Number(quote.price) || 0);
-    S().update('quotes', quoteId, {
-      status: 'accepted',
-      acceptedAt: new Date().toISOString(),
-      tax: agreedTax,
-      total: Math.round(((Number(quote.price) || 0) + agreedTax) * 100) / 100,
-      taxRateAtAccept: CF.pricing.taxRate(),
-      taxEnabledAtAccept: !!S().get().settings.taxEnabled
-    }, 'Accept quote');
+    //
+    // Freezing happens once. Rebooking a quote whose job was cancelled comes
+    // back through here, and re-freezing at the rate in force *then* rewrote
+    // the agreement: a total agreed at 5% became a total at 25% because the
+    // owner had changed their rate in between.
+    var patch = { status: 'accepted' };
+    if (quote.taxRateAtAccept === undefined || quote.taxRateAtAccept === null) {
+      var agreedTax = CF.pricing.taxOn(Number(quote.price) || 0);
+      patch.acceptedAt = new Date().toISOString();
+      patch.tax = agreedTax;
+      patch.total = Math.round(((Number(quote.price) || 0) + agreedTax) * 100) / 100;
+      patch.taxRateAtAccept = CF.pricing.taxRate();
+      patch.taxEnabledAtAccept = !!S().get().settings.taxEnabled;
+    }
+    S().update('quotes', quoteId, patch, 'Accept quote');
 
     var job = bookJob(Object.assign({
       clientId: clientId,
@@ -730,12 +851,28 @@
 
   /* ---- Expenses -------------------------------------------------------------- */
 
+  /**
+   * Money out. This had no validation at all, and it sits directly under the
+   * profit figure: a single expense of `Infinity` or `'abc'` made the month's
+   * expenses and profit non-finite, so the whole Money screen read as nothing.
+   * A negative expense quietly added to profit instead of subtracting from it.
+   */
   function addExpense(data) {
-    return S().insert('expenses', Object.assign({
-      amount: 0, category: 'Supplies', note: '', date: F().today()
-    }, data), 'Add expense', {
+    var d = data || {};
+    var amount = money(d.amount);
+    if (amount === null) {
+      warn('Enter an amount above zero for this expense');
+      return null;
+    }
+    var row = Object.assign({}, d, {
+      amount: amount,
+      category: expenseCategory(d.category === undefined ? 'Supplies' : d.category),
+      note: tidyBlock(d.note === undefined ? '' : d.note, MAX_TEXT),
+      date: F().safeDateKey(d.date, F().today())
+    });
+    return S().insert('expenses', row, 'Add expense', {
       icon: '🧾',
-      text: (data.category || 'Expense') + ' — ' + F().money(data.amount)
+      text: row.category + ' — ' + F().money(row.amount)
     });
   }
 
