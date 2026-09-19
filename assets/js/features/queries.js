@@ -188,6 +188,43 @@
     }), 'desc');
   }
 
+  /** How long this job is expected to take, in minutes. */
+  function jobMinutes(job) {
+    if (!job) return 0;
+    var svc = service(job.serviceId);
+    return Number(job.estMinutes) || (svc && Number(svc.estMinutes)) || 120;
+  }
+
+  function toMinutes(hhmm) {
+    var parts = String(hhmm || '09:00').split(':');
+    var h = Number(parts[0]), m = Number(parts[1] || 0);
+    if (!isFinite(h)) h = 9;
+    if (!isFinite(m)) m = 0;
+    return h * 60 + m;
+  }
+
+  /**
+   * Other jobs whose time on the same day overlaps this one.
+   *
+   * Solo cleaners sometimes stack deliberately (a helper, a quick top-up), so
+   * this reports rather than forbids — but booking two 9am cleans with nothing
+   * said is how a client gets stood up.
+   */
+  function conflictsFor(candidate) {
+    if (!candidate || !candidate.date || !candidate.time) return [];
+    var startA = toMinutes(candidate.time);
+    var endA = startA + (Number(candidate.minutes) || 0);
+
+    return liveJobs().filter(function (j) {
+      if (j.id === candidate.excludeId) return false;
+      if (j.date !== candidate.date) return false;
+      if (j.status === 'completed') return false;
+      var startB = toMinutes(j.time);
+      var endB = startB + jobMinutes(j);
+      return startA < endB && startB < endA;
+    }).sort(function (a, b) { return toMinutes(a.time) - toMinutes(b.time); });
+  }
+
   function jobTotal(job) {
     if (!job) return 0;
     var extras = (job.extras || []).reduce(function (a, e) {
@@ -562,10 +599,13 @@
 
     function match(text) { return String(text || '').toLowerCase().indexOf(q) !== -1; }
 
-    activeClients().forEach(function (c) {
+    // Archived clients are searchable too. Archiving someone should not make
+    // their history impossible to find — that is the reason it is kept.
+    S().all('clients').forEach(function (c) {
       if (match(c.name) || match(c.phone) || match(c.email) || match(c.address)) {
         hits.push({
-          type: 'Client', icon: '👥', title: c.name,
+          type: 'Client', icon: '👥',
+          title: c.name + (c.archivedAt ? ' (archived)' : ''),
           sub: [serviceName(c.preferredServiceId, ''), c.address].filter(Boolean).join(' · '),
           route: '#/clients/' + c.id
         });
@@ -615,6 +655,7 @@
     todaysJobsIncludingDone: todaysJobsIncludingDone,
     upcomingJobs: upcomingJobs, overdueJobs: overdueJobs,
     stalledJobs: stalledJobs, nextOccurrence: nextOccurrence,
+    jobMinutes: jobMinutes, conflictsFor: conflictsFor,
     recurringJobs: recurringJobs, completedJobs: completedJobs,
     jobsForClient: jobsForClient, jobTotal: jobTotal, checklistProgress: checklistProgress,
     sortByWhen: sortByWhen,

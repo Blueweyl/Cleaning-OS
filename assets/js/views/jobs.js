@@ -544,12 +544,13 @@
       date: F.today(), time: '09:00',
       price: (services[0] || {}).basePrice || 0,
       address: '', notes: '',
-      frequency: 'one-time'
+      frequency: 'one-time', until: ''
     }, existing ? {
       clientId: existing.clientId, serviceId: existing.serviceId,
       date: existing.date, time: existing.time, price: existing.price,
       address: existing.address, notes: existing.notes,
-      frequency: (existing.recurrence && existing.recurrence.frequency) || 'one-time'
+      frequency: (existing.recurrence && existing.recurrence.frequency) || 'one-time',
+      until: (existing.recurrence && existing.recurrence.until) || ''
     } : {});
 
     if (!isEdit && draft.clientId) applyClientDefaults(draft.clientId, true);
@@ -604,16 +605,43 @@
         serviceField.node,
         el('div.grid.grid-2', [
           U.field({ label: 'Date', type: 'date', value: draft.date, required: true,
-            onChange: function (v) { draft.date = v; } }).node,
+            min: '2000-01-01', max: '2100-12-31',
+            onChange: function (v) { draft.date = v; build(); } }).node,
           U.field({ label: 'Start time', type: 'time', value: draft.time,
-            onChange: function (v) { draft.time = v; } }).node
+            onChange: function (v) { draft.time = v; build(); } }).node
         ]),
         priceField.node,
         U.field({ label: 'Repeats', type: 'select', value: draft.frequency,
           hint: 'On a repeating job, finishing one visit books the next automatically.',
           options: CF.schema.FREQUENCIES.map(function (f) { return { value: f.id, label: f.label }; }),
-          onChange: function (v) { draft.frequency = v; } }).node
-      ]));
+          onChange: function (v) { draft.frequency = v; build(); } }).node,
+
+        // Without a last date the only way to stop a repeat is to remember to
+        // end it by hand — easy to forget on a contract with a known end.
+        draft.frequency !== 'one-time'
+          ? U.field({ label: 'Repeat until (optional)', type: 'date', value: draft.until,
+              hint: 'Leave blank to keep repeating. The last visit booked will be on or before this date.',
+              onChange: function (v) { draft.until = v; } }).node
+          : null
+      ].filter(Boolean)));
+
+      var clash = Q.conflictsFor({
+        date: draft.date, time: draft.time,
+        minutes: Q.jobMinutes({ serviceId: draft.serviceId }),
+        excludeId: id || null
+      });
+      if (clash.length) {
+        body.appendChild(el('div.callout.callout--warn', [
+          el('strong', '⚠ That overlaps ' + F.plural(clash.length, 'job') + ' already booked. '),
+          clash.slice(0, 3).map(function (j) {
+            return el('div.meta', F.clockTime(j.time) + ' · ' +
+              Q.clientName(j.clientId, j.clientName) + ' · ' +
+              F.hoursLabel(Q.jobMinutes(j)));
+          }),
+          el('div.meta', { style: { marginTop: '6px' } },
+            'You can still book it — CleanFlow will not stop you.')
+        ]));
+      }
 
       body.appendChild(el('div.card.card--roomy.stack.stack-4', [
         addressField.node,
@@ -644,6 +672,18 @@
 
     function save() {
       if (!draft.clientId) { CF.ui.toast('Pick a client first', { tone: 'bad' }); return; }
+
+      var when = F.fromKey(draft.date);
+      if (!when || isNaN(when.getTime()) ||
+          when.getFullYear() < 2000 || when.getFullYear() > 2100) {
+        CF.ui.toast('That date does not look right — check the year', { tone: 'bad' });
+        return;
+      }
+      if (draft.until && draft.until < draft.date) {
+        CF.ui.toast('The repeat end date is before the first visit', { tone: 'bad' });
+        return;
+      }
+
       var payload = {
         clientId: draft.clientId,
         clientName: Q.clientName(draft.clientId),
@@ -652,7 +692,11 @@
         date: draft.date, time: draft.time,
         price: Number(draft.price) || 0,
         address: draft.address, notes: draft.notes,
-        recurrence: { frequency: draft.frequency, endedAt: null }
+        recurrence: {
+          frequency: draft.frequency, endedAt: null,
+          until: draft.frequency === 'one-time' ? null : (draft.until || null),
+          anchorDay: (F.fromKey(draft.date) || new Date()).getDate()
+        }
       };
 
       if (isEdit) {

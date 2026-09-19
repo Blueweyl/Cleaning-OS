@@ -38,6 +38,13 @@
     return Math.round(base * taxRate()) / 100;
   }
 
+  /** A number inside plausible bounds, or the fallback when it is not one. */
+  function clamp(value, min, max, fallback) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
   function round(value) {
     var step = settings().roundTo || 5;
     if (step <= 1) return Math.round(value);
@@ -58,14 +65,16 @@
     var base = Number(svc.basePrice) || 0;
 
     // Size — only charged above the baseline, never a discount below it.
-    var sqft = Number(input.sqft) || SIZE_BASELINE;
+    // Clamped: a stray zero turns 1,800 sq ft into a $82,000,000,015 quote, and
+    // a negative count used to produce a $5 one.
+    var sqft = clamp(input.sqft, 100, 200000, SIZE_BASELINE);
     var sizeAdjust = Math.round(
       Math.max(0, (sqft - SIZE_BASELINE) / 100) * SIZE_RATE_PER_100
     );
 
     // Rooms — beds and baths drive time more than floor area does.
-    var beds = Number(input.beds) || BED_BASELINE;
-    var baths = Number(input.baths) || BATH_BASELINE;
+    var beds = clamp(input.beds, 0, 30, BED_BASELINE);
+    var baths = clamp(input.baths, 0, 30, BATH_BASELINE);
     var roomAdjust = (beds - BED_BASELINE) * PER_BED + (baths - BATH_BASELINE) * PER_BATH;
 
     // Condition.

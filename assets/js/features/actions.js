@@ -14,7 +14,96 @@
 
   /* ---- Clients ----------------------------------------------------------- */
 
+  var MAX_NAME = 120;
+  var MAX_TEXT = 2000;
+
+  /**
+   * Tidy what a person typed without second-guessing it.
+   *
+   * Names arrived with their padding intact, so "  Sarah" sorted before
+   * everyone and a tab pasted from a spreadsheet broke both the layout and the
+   * CSV. Sizes arrived unchecked, and a bedroom count of -5 produced a $5
+   * quote. Nothing here changes a value a person could plausibly have meant.
+   */
+  function cleanClientFields(data) {
+    var out = Object.assign({}, data);
+
+    if (out.name !== undefined) out.name = tidyLine(out.name, MAX_NAME);
+    ['phone', 'email', 'address', 'propertyType'].forEach(function (k) {
+      if (out[k] !== undefined) out[k] = tidyLine(out[k], MAX_NAME * 2);
+    });
+    ['access', 'pets', 'preferences', 'notes', 'contract'].forEach(function (k) {
+      if (out[k] !== undefined) out[k] = tidyBlock(out[k], MAX_TEXT);
+    });
+
+    if (out.beds !== undefined)  out.beds  = clampCount(out.beds, 0, 30, 2);
+    if (out.baths !== undefined) out.baths = clampCount(out.baths, 0, 30, 1);
+    if (out.sqft !== undefined)  out.sqft  = clampSqft(out.sqft);
+
+    return out;
+  }
+
+  /** One line: no tabs or newlines, no runs of spaces, no padding. */
+  function tidyLine(value, max) {
+    var s = String(value === null || value === undefined ? '' : value)
+      .replace(/[\u0000-\u001F\u007F]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return s.length > max ? s.slice(0, max).trim() : s;
+  }
+
+  /** Multi-line: keep the line breaks, drop the other control characters. */
+  function tidyBlock(value, max) {
+    var s = String(value === null || value === undefined ? '' : value)
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return s.length > max ? s.slice(0, max).trim() : s;
+  }
+
+  function clampCount(value, min, max, fallback) {
+    var n = Number(value);
+    if (!isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(n)));
+  }
+
+  function clampSqft(value) {
+    if (value === '' || value === null || value === undefined) return null;
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return null;
+    return Math.min(200000, Math.round(n));
+  }
+
+  /** A name reduced to what a duplicate check should compare. */
+  function nameKey(name) {
+    return tidyLine(name, MAX_NAME).toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  /** Digits only, so "(512) 555-0100" and "5125550100" are the same number. */
+  function phoneKey(phone) {
+    var digits = String(phone || '').replace(/\D/g, '');
+    return digits.length >= 7 ? digits.slice(-10) : '';
+  }
+
+  /**
+   * Clients that look like the one being entered. Reported, never enforced —
+   * two households really can share a name.
+   */
+  function likelyDuplicates(data, excludeId) {
+    var nk = nameKey(data.name);
+    var pk = phoneKey(data.phone);
+    if (!nk && !pk) return [];
+    return CF.q.activeClients().filter(function (c) {
+      if (c.id === excludeId) return false;
+      if (nk && nameKey(c.name) === nk) return true;
+      return !!(pk && phoneKey(c.phone) === pk);
+    });
+  }
+
   function createClient(data) {
+    data = cleanClientFields(data || {});
     return S().insert('clients', Object.assign({
       name: '', phone: '', email: '', address: '',
       propertyType: 'House', sqft: null, beds: 2, baths: 1,
@@ -29,11 +118,41 @@
     });
   }
 
+  /** Jobs still ahead of today for this client — what archiving has to settle. */
+  function futureWorkFor(clientId) {
+    var t = F().today();
+    return CF.q.liveJobs().filter(function (j) {
+      return j.clientId === clientId && j.status !== 'completed' && j.date >= t;
+    });
+  }
+
+  /**
+   * Archiving says "this client has stopped". Their history stays, but their
+   * future bookings must not: leaving them behind put an ex-client's clean on
+   * Today's schedule and kept rebooking them forever.
+   *
+   * Unpaid invoices are deliberately untouched — you still want that money.
+   */
   function archiveClient(id) {
     var c = S().find('clients', id);
     if (!c) return null;
-    return S().update('clients', id, { archivedAt: new Date().toISOString() },
-      'Archive client', { icon: '📦', text: 'Archived ' + c.name + ' — history kept' });
+    var pending = futureWorkFor(id);
+
+    return S().transaction('Archive client', function () {
+      pending.forEach(function (j) {
+        S().update('jobs', j.id, {
+          status: 'cancelled',
+          recurrence: Object.assign({}, j.recurrence, { endedAt: new Date().toISOString() })
+        }, 'Cancel job');
+      });
+      return S().update('clients', id, { archivedAt: new Date().toISOString() },
+        'Archive client', {
+          icon: '📦',
+          text: 'Archived ' + c.name + (pending.length
+            ? ' — history kept, ' + F().plural(pending.length, 'upcoming job') + ' cancelled'
+            : ' — history kept')
+        });
+    });
   }
 
   function unarchiveClient(id) {
@@ -52,6 +171,19 @@
     return tpl.items.map(function (label, i) {
       return { id: 'ci-' + i + '-' + Math.random().toString(36).slice(2, 6), label: label, done: false };
     });
+  }
+
+  /**
+   * The window a cleaning job can plausibly sit in. A typo like "0226-03-04"
+   * from a date field, or a paste into a restored file, would otherwise put a
+   * job 1,800 years out where no list will ever show it.
+   */
+  function saneDate(key, fallback) {
+    var d = F().fromKey(key);
+    if (!d || isNaN(d.getTime())) return fallback;
+    var year = d.getFullYear();
+    if (year < 2000 || year > 2100) return fallback;
+    return F().toKey(d);
   }
 
   function bookJob(data) {
@@ -77,6 +209,7 @@
     }, data);
 
     if (!job.checklist || !job.checklist.length) job.checklist = checklistFor(job.serviceId);
+    job.date = saneDate(job.date, F().today());
 
     return S().insert('jobs', job, 'Book job', {
       icon: '📅',
@@ -172,7 +305,7 @@
    * only the last step would leave the job completed and the invoice raised
    * while quietly deleting the next booking.
    */
-  function completeJob(jobId) {
+  function completeJob(jobId, options) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
     // Already closed: return what exists rather than re-stamping a finished
@@ -183,6 +316,17 @@
         invoice: job.invoiceId ? S().find('invoices', job.invoiceId) : null,
         nextJob: null
       };
+    }
+
+    // The UI disables the button until every item is ticked; this is the same
+    // rule at the layer that actually writes, so an imported or hand-edited
+    // file cannot close a job whose work was never recorded as done.
+    var progress = CF.q.checklistProgress(job);
+    if (!(options && options.force) && progress.total > 0 && !progress.complete) {
+      if (CF.ui && CF.ui.toast) {
+        CF.ui.toast('Finish every checklist item before closing this job', { tone: 'bad' });
+      }
+      return null;
     }
 
     var seconds = elapsedSeconds(job);
@@ -234,6 +378,10 @@
     var anchorDay = job.recurrence.anchorDay || dayOfMonth(from);
     var next = CF.q.nextOccurrence(from, freq, F().today(), anchorDay);
 
+    // A repeat can be given a last date. Without this the only way to stop a
+    // schedule was to remember to end it by hand, forever.
+    if (job.recurrence.until && next && next > job.recurrence.until) return null;
+
     return bookJob({
       clientId: job.clientId,
       clientName: job.clientName,
@@ -244,7 +392,10 @@
       price: job.price,
       address: job.address,
       notes: job.notes,
-      recurrence: { frequency: freq, endedAt: null, anchorDay: anchorDay },
+      recurrence: {
+        frequency: freq, endedAt: null, anchorDay: anchorDay,
+        until: job.recurrence.until || null
+      },
       checklist: checklistFor(job.serviceId)
     });
   }
@@ -477,7 +628,9 @@
   }
 
   CF.actions = {
-    createClient: createClient, archiveClient: archiveClient, unarchiveClient: unarchiveClient,
+    createClient: createClient,
+    cleanClientFields: cleanClientFields,
+    likelyDuplicates: likelyDuplicates, futureWorkFor: futureWorkFor, archiveClient: archiveClient, unarchiveClient: unarchiveClient,
     bookJob: bookJob, startJob: startJob, pauseJob: pauseJob, resumeJob: resumeJob,
     elapsedSeconds: elapsedSeconds, timerLooksForgotten: timerLooksForgotten,
     toggleChecklistItem: toggleChecklistItem,

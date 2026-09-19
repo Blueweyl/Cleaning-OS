@@ -325,10 +325,26 @@
     }
 
     function archive() {
+      // Say out loud what happens to work already on the calendar. Archiving
+      // silently used to leave an ex-client's clean sitting on Today's list.
+      var pending = CF.actions.futureWorkFor(c.id);
+      var owed = CF.q.openInvoices().filter(function (i) { return i.clientId === c.id; });
+
+      var lines = ['They come off your active list but every job, invoice and note is kept. ' +
+                   'You can restore them at any time.'];
+      if (pending.length) {
+        lines.push(CF.fmt.plural(pending.length, 'upcoming job') +
+                   ' will be cancelled and any repeat stopped.');
+      }
+      if (owed.length) {
+        lines.push(CF.fmt.money(owed.reduce(function (a, i) {
+          return a + CF.q.invoiceRemaining(i);
+        }, 0)) + ' still owed stays on your books to collect.');
+      }
+
       CF.ui.confirm({
         title: 'Archive ' + c.name + '?',
-        message: 'They come off your active list but every job, invoice and note is kept. ' +
-                 'You can restore them at any time.',
+        message: lines.join(' '),
         confirmLabel: 'Archive'
       }).then(function (ok) {
         if (!ok) return;
@@ -369,6 +385,9 @@
       frequency: 'one-time', status: 'active', contract: ''
     }, existing || {});
 
+    var dupeAcknowledged = false;
+    var emailField;
+
     var nameField = U.field({
       label: 'Client name', value: draft.name, required: true, autofocus: !isEdit,
       placeholder: 'e.g. Sarah Miller',
@@ -376,6 +395,11 @@
     });
 
     var form = el('form.stack.stack-5', {
+      // The browser's own validation bubble is a tooltip that vanishes and is
+      // easy to miss one-handed in someone's kitchen. Validation is handled in
+      // save() instead, so every message appears inline under its field, in the
+      // same voice as the rest of the app, and stays there.
+      novalidate: true,
       onsubmit: function (e) { e.preventDefault(); save(); }
     }, [
       el('div.card.card--roomy.stack.stack-4', [
@@ -385,9 +409,9 @@
           U.field({ label: 'Phone', value: draft.phone, type: 'tel',
             placeholder: '(512) 555-0100',
             onInput: function (v) { draft.phone = v; } }).node,
-          U.field({ label: 'Email', value: draft.email, type: 'email',
+          (emailField = U.field({ label: 'Email', value: draft.email, type: 'email',
             placeholder: 'name@email.com',
-            onInput: function (v) { draft.email = v; } }).node
+            onInput: function (v) { draft.email = v; emailField.setError(''); } })).node
         ]),
         U.field({ label: 'Address', value: draft.address,
           placeholder: '142 Maple Ave, Austin, TX',
@@ -465,22 +489,60 @@
     ]);
 
     function save() {
-      if (!draft.name.trim()) {
+      // Tidy first, then validate what will actually be stored — otherwise a
+      // name of pure whitespace passes the check and saves as empty.
+      var clean = CF.actions.cleanClientFields(draft);
+
+      if (!clean.name) {
         nameField.setError('Enter the client\'s name to continue.');
         nameField.input.focus();
         return;
       }
-      draft.sqft = draft.sqft === '' ? null : Number(draft.sqft);
+      if (clean.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(clean.email)) {
+        emailField.setError('That email address does not look complete.');
+        emailField.input.focus();
+        return;
+      }
 
+      var dupes = CF.actions.likelyDuplicates(clean, isEdit ? id : null);
+      if (dupes.length && !dupeAcknowledged) {
+        askAboutDuplicate(dupes[0], clean);
+        return;
+      }
+      commitSave(clean);
+    }
+
+    function commitSave(clean) {
       if (isEdit) {
-        CF.store.update('clients', id, draft, 'Edit client');
+        CF.store.update('clients', id, clean, 'Edit client');
         CF.ui.toast('Client updated');
         go('#/clients/' + id);
       } else {
-        var created = CF.actions.createClient(draft);
+        var created = CF.actions.createClient(clean);
         CF.ui.toast(created.name + ' added');
         go('#/clients/' + created.id);
       }
+    }
+
+    /**
+     * Two records for one household is the quiet way a client's history splits
+     * in half. Offered, not enforced — two families really can share a name.
+     */
+    function askAboutDuplicate(match, clean) {
+      var why = CF.actions.likelyDuplicates({ name: '', phone: clean.phone },
+        isEdit ? id : null).length
+        ? 'the same phone number' : 'the same name';
+
+      CF.ui.confirm({
+        title: 'You may already have this client',
+        message: match.name + ' has ' + why + '. Adding another record splits ' +
+                 'their job history and invoices between the two.',
+        confirmLabel: 'Add Anyway',
+        cancelLabel: 'Open ' + match.name
+      }).then(function (ok) {
+        if (ok) { dupeAcknowledged = true; commitSave(clean); }
+        else go('#/clients/' + match.id);
+      });
     }
   }
 

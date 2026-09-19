@@ -68,6 +68,16 @@ it turns up under **Needs Closing** on the Jobs screen and on your Home screen
 the next morning. If the timer was left running overnight, the clean screen says
 so and offers to reset it rather than recording a 20-hour job.
 
+**Archiving a client settles their calendar.** History, invoices and notes are
+all kept, and anything still owed stays on your books — but upcoming jobs are
+cancelled and the repeat is stopped, so an ex-client can't turn up on Today's
+list. The dialog tells you exactly what it's about to do before you confirm.
+
+**CleanFlow warns you before you make a mess.** Booking over a job you already
+have, or adding a second record for a client you already have, both get a warning
+that explains the consequence — and both let you go ahead anyway. It's your
+business.
+
 **Grow only shows real opportunities.** A client appears under "ready to rebook"
 because their actual cleaning interval has lapsed with nothing booked ahead, not
 because a counter ticked over.
