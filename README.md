@@ -211,6 +211,9 @@ survives — not the one before it. If the main store was left half-written,
 CleanFlow reads the backup copy instead and tells you it did. And if neither copy
 can be read, it stops and says so rather than opening as if you were a new user:
 your data is set aside, nothing is overwritten, and you're offered a restore.
+Only the two most recent set-aside copies are kept — they're whole databases, and
+keeping every one of them would eventually fill this browser's storage and take
+the instant-save copy down with it.
 
 **Damaged data is recovered, not written off.** The usual cause of corruption is a
 save that got cut off part-way — and the start of the file is still perfectly

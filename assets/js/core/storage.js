@@ -168,6 +168,38 @@
    * discarded — it may still be recoverable by hand, and it must not be
    * overwritten by the empty database the app would otherwise start with.
    */
+  /** How many set-aside copies to keep. The newest is the one worth salvaging. */
+  var MAX_QUARANTINE = 2;
+
+  /**
+   * Make room before setting another copy aside.
+   *
+   * Each quarantine is a whole database — for a working business, megabytes of
+   * it. Nothing ever removed them, so a browser that corrupts a write more than
+   * once accumulated copies until localStorage was full: at that point the
+   * mirror (the only store that can be written as the tab closes) has nowhere
+   * to go, and the newest quarantine silently fails to be written at all. The
+   * accumulation was bounded only by running out of room, which is the harm.
+   *
+   * The oldest go first — they are the least likely to be salvageable and the
+   * most likely to predate whatever the owner still wants back.
+   */
+  function pruneQuarantine(keep) {
+    var keys = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(LS_QUARANTINE) === 0) keys.push(k);
+      }
+    } catch (e) { return; }
+    // The keys carry a timestamp, so sorting them sorts by age.
+    keys.sort();
+    while (keys.length > keep) {
+      var oldest = keys.shift();
+      try { localStorage.removeItem(oldest); } catch (e) { /* keep going */ }
+    }
+  }
+
   function localRead() {
     var raw;
     try { raw = localStorage.getItem(LS_KEY); }
@@ -177,8 +209,17 @@
       return { ok: true, payload: unwrap(JSON.parse(raw)) };
     } catch (e) {
       var key = LS_QUARANTINE + Date.now();
+      // Leave room for the copy about to be written, and for the mirror after
+      // it. Pruning first is what makes the new copy fit at all.
+      pruneQuarantine(MAX_QUARANTINE - 1);
       try { localStorage.setItem(key, raw); localStorage.removeItem(LS_KEY); quarantined = key; }
-      catch (e2) { /* nothing more we can do; leave it in place */ }
+      catch (e2) {
+        // Still no room. Drop the older copies entirely rather than lose the
+        // newest, which is the one that reflects the work just done.
+        pruneQuarantine(0);
+        try { localStorage.setItem(key, raw); localStorage.removeItem(LS_KEY); quarantined = key; }
+        catch (e3) { /* nothing more we can do; leave it in place */ }
+      }
       return { ok: false, error: new Error('Stored data was unreadable'), corrupt: true };
     }
   }
