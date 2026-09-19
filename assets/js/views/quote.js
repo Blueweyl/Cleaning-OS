@@ -389,6 +389,7 @@
       var c = calc();
       var quote = CF.actions.saveQuote(Object.assign(payload(c), { status: 'sent' }));
       var result = CF.actions.acceptQuote(quote.id, { date: F.today() });
+      if (!result) return;          // the write was refused; the toast explains why
       draft = null;
       CF.ui.toast('Quote accepted — job booked');
       go('#/jobs/' + result.job.id + '/edit');
@@ -496,6 +497,7 @@
 
     function accept() {
       var result = CF.actions.acceptQuote(quote.id, { date: F.today() });
+      if (!result) return;          // the write was refused; the toast explains why
       CF.ui.toast('Job booked' + (quote.clientId ? '' : ' and client created'));
       go('#/jobs/' + result.job.id + '/edit');
     }

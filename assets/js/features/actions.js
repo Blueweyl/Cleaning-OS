@@ -94,6 +94,10 @@
   }
 
   function startJob(id) {
+    var job = S().find('jobs', id);
+    // Reopening a completed job would leave it in_progress while still carrying
+    // a completedDate and a raised invoice — counted as done and as running.
+    if (!job || job.status === 'completed') return job || null;
     return S().update('jobs', id, {
       status: 'in_progress',
       startedAt: new Date().toISOString()
@@ -112,11 +116,25 @@
     return S().update('jobs', id, { startedAt: new Date().toISOString() }, 'Resume timer');
   }
 
+  /** A clean nobody would claim to have worked in one sitting. */
+  var IMPLAUSIBLE_SECONDS = 12 * 3600;
+
   function elapsedSeconds(job) {
     if (!job) return 0;
-    var banked = job.elapsedSeconds || 0;
+    var banked = Number(job.elapsedSeconds) || 0;
+    if (banked < 0) banked = 0;
     if (!job.startedAt) return banked;
-    return banked + Math.floor((Date.now() - new Date(job.startedAt).getTime()) / 1000);
+
+    var since = Math.floor((Date.now() - new Date(job.startedAt).getTime()) / 1000);
+    // A clock that moved backwards (or a timezone change) makes this negative;
+    // never let it eat into time already banked.
+    if (!isFinite(since) || since < 0) since = 0;
+    return banked + since;
+  }
+
+  /** True when the recorded time is long enough to be a forgotten timer. */
+  function timerLooksForgotten(job) {
+    return elapsedSeconds(job) > IMPLAUSIBLE_SECONDS;
   }
 
   function toggleChecklistItem(jobId, itemId) {
@@ -157,6 +175,15 @@
   function completeJob(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
+    // Already closed: return what exists rather than re-stamping a finished
+    // job with today's date and a fresh duration.
+    if (job.status === 'completed') {
+      return {
+        job: job,
+        invoice: job.invoiceId ? S().find('invoices', job.invoiceId) : null,
+        nextJob: null
+      };
+    }
 
     var seconds = elapsedSeconds(job);
     var invoice = null;
@@ -197,19 +224,34 @@
     var days = CF.q.intervalDays(freq);
     if (!days) return null;
 
+    // Step from the date the visit was *due*, not the day it happened to be
+    // closed, so a clean finished late does not push the whole schedule back.
+    // Then skip forward past today, because booking the next visit into a date
+    // that has already gone is how a job lands in "Needs Closing" at birth.
+    var from = job.date || job.completedDate;
+    // The day of the month the schedule is pinned to, carried forward so a
+    // clamp in February does not move the client permanently earlier.
+    var anchorDay = job.recurrence.anchorDay || dayOfMonth(from);
+    var next = CF.q.nextOccurrence(from, freq, F().today(), anchorDay);
+
     return bookJob({
       clientId: job.clientId,
       clientName: job.clientName,
       serviceId: job.serviceId,
       serviceName: job.serviceName,
-      date: F().addDays(job.completedDate || job.date, days),
+      date: next || F().addDays(job.completedDate || job.date, days),
       time: job.time,
       price: job.price,
       address: job.address,
       notes: job.notes,
-      recurrence: { frequency: freq, endedAt: null },
+      recurrence: { frequency: freq, endedAt: null, anchorDay: anchorDay },
       checklist: checklistFor(job.serviceId)
     });
+  }
+
+  function dayOfMonth(key) {
+    var d = F().fromKey(key);
+    return d ? d.getDate() : null;
   }
 
   function endRecurring(jobId) {
@@ -220,16 +262,28 @@
     }, 'End recurring');
   }
 
+  /**
+   * Push this visit out by one interval. Skipping an already-overdue job used
+   * to move it from one past date to another — three taps to get a job that
+   * was three weeks late back into the future — so the date always lands ahead
+   * of today.
+   */
   function skipNextOccurrence(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
-    var days = CF.q.intervalDays(job.recurrence && job.recurrence.frequency) || 7;
-    return S().update('jobs', jobId, { date: F().addDays(job.date, days) }, 'Skip next');
+    var freq = (job.recurrence && job.recurrence.frequency) || 'weekly';
+    var anchorDay = (job.recurrence && job.recurrence.anchorDay) || dayOfMonth(job.date);
+    var next = CF.q.nextOccurrence(job.date, freq, F().today(), anchorDay) ||
+               F().addDays(F().today(), CF.q.intervalDays(freq) || 7);
+    return S().update('jobs', jobId, { date: next }, 'Skip next');
   }
 
   function cancelJob(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
+    // A completed job has an invoice against it. Cancelling the job would
+    // leave that invoice live and payable with nothing to explain it.
+    if (job.status === 'completed') return job;
     return S().update('jobs', jobId, { status: 'cancelled' }, 'Cancel job', {
       icon: '🚫', text: 'Cancelled job for ' + CF.q.clientName(job.clientId, job.clientName)
     });
@@ -425,7 +479,8 @@
   CF.actions = {
     createClient: createClient, archiveClient: archiveClient, unarchiveClient: unarchiveClient,
     bookJob: bookJob, startJob: startJob, pauseJob: pauseJob, resumeJob: resumeJob,
-    elapsedSeconds: elapsedSeconds, toggleChecklistItem: toggleChecklistItem,
+    elapsedSeconds: elapsedSeconds, timerLooksForgotten: timerLooksForgotten,
+    toggleChecklistItem: toggleChecklistItem,
     addExtraCharge: addExtraCharge, removeExtraCharge: removeExtraCharge,
     completeJob: completeJob, cancelJob: cancelJob,
     rollRecurring: rollRecurring, endRecurring: endRecurring,

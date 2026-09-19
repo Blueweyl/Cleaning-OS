@@ -71,6 +71,26 @@
     return toKey(d);
   }
 
+  /**
+   * Step whole calendar months, keeping the day of the month where it can.
+   * Jan 31 + 1 month is Feb 28, not Mar 3 — a client booked for the last day
+   * of the month should not creep into the next one.
+   *
+   * `anchorDay` is the day the schedule is really pinned to. Without it a
+   * clamped date becomes the new anchor and the schedule ratchets earlier for
+   * good: Jan 31 → Feb 28 → Mar 28 → Apr 28. Pass the original day and the
+   * clamp only applies to the short months it has to.
+   */
+  function addMonths(key, months, anchorDay) {
+    var d = fromKey(key);
+    if (!d) return key;
+    var day = Number(anchorDay) || d.getDate();
+    var target = new Date(d.getFullYear(), d.getMonth() + months, 1);
+    var lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(day, lastDay));
+    return toKey(target);
+  }
+
   function daysBetween(a, b) {
     var da = fromKey(a), db = fromKey(b);
     if (!da || !db) return 0;
@@ -180,6 +200,7 @@
   CF.fmt = {
     money: money, parseMoney: parseMoney,
     today: today, toKey: toKey, fromKey: fromKey, addDays: addDays,
+    addMonths: addMonths,
     daysBetween: daysBetween, shortDate: shortDate, longDate: longDate,
     relativeDate: relativeDate, agoPhrase: agoPhrase,
     clockTime: clockTime, whenLabel: whenLabel,

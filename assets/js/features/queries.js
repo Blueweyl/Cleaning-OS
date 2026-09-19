@@ -109,12 +109,59 @@
     }));
   }
 
-  /** Scheduled but the date has passed — easy to forget, so surface it. */
+  /**
+   * Past its date and still not closed — easy to forget, so surface it.
+   *
+   * Includes jobs left `in_progress`, not just `scheduled` ones. A clean that
+   * was started and never closed matched no bucket at all: not today's (wrong
+   * date), not upcoming (past), not completed, not overdue. The job and its
+   * money simply disappeared from the app the next morning.
+   */
   function overdueJobs() {
     var t = F().today();
     return sortByWhen(liveJobs().filter(function (j) {
-      return j.date < t && j.status === 'scheduled';
+      return j.date < t && (j.status === 'scheduled' || j.status === 'in_progress');
     }));
+  }
+
+  /** A clean that is still running but was not started today. */
+  function stalledJobs() {
+    var t = F().today();
+    return liveJobs().filter(function (j) {
+      return j.status === 'in_progress' && j.date < t;
+    });
+  }
+
+  /**
+   * The next date on or after `from` that keeps a repeating schedule's shape.
+   * Weekly and bi-weekly step in days; monthly and quarterly step in calendar
+   * months, so "the 15th" stays the 15th instead of sliding backwards by a day
+   * or two every visit the way a flat 30-day step does.
+   */
+  function nextOccurrence(dateKey, frequency, notBefore, anchorDay) {
+    var days = intervalDays(frequency);
+    if (!days) return null;
+
+    var months = frequency === 'monthly' ? 1 : frequency === 'quarterly' ? 3 : 0;
+
+    // Always measured from the original date rather than from the last result,
+    // so repeated steps cannot compound a clamp or a rounding.
+    function step(n) {
+      return months ? F().addMonths(dateKey, months * n, anchorDay)
+                    : F().addDays(dateKey, days * n);
+    }
+
+    var n = 1;
+    var next = step(1);
+    if (!notBefore) return next;
+
+    // Skip whole intervals until the date is genuinely ahead. Bounded so a
+    // date from years back cannot spin here.
+    while (next <= notBefore && n < 500) {
+      n += 1;
+      next = step(n);
+    }
+    return next;
   }
 
   /**
@@ -465,7 +512,8 @@
       items.push({
         tone: 'hot',
         title: 'Unfinished job — ' + clientName(j.clientId, j.clientName),
-        sub: F().shortDate(j.date) + ' · still marked scheduled',
+        sub: F().shortDate(j.date) + ' · ' + (j.status === 'in_progress'
+               ? 'timer still running' : 'still marked scheduled'),
         cta: 'Open',
         route: '#/jobs/' + j.id
       });
@@ -566,6 +614,7 @@
     jobs: jobs, liveJobs: liveJobs, todaysJobs: todaysJobs,
     todaysJobsIncludingDone: todaysJobsIncludingDone,
     upcomingJobs: upcomingJobs, overdueJobs: overdueJobs,
+    stalledJobs: stalledJobs, nextOccurrence: nextOccurrence,
     recurringJobs: recurringJobs, completedJobs: completedJobs,
     jobsForClient: jobsForClient, jobTotal: jobTotal, checklistProgress: checklistProgress,
     sortByWhen: sortByWhen,

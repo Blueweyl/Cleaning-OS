@@ -44,7 +44,7 @@
 
     if (overdue.length && view === 'today') {
       page.appendChild(el('div.callout.callout--warn.mb-4', [
-        el('strong', F.plural(overdue.length, 'job') + ' still marked scheduled from a past date. '),
+        el('strong', F.plural(overdue.length, 'job') + ' from a past date is still open. '),
         el('button.linkbtn', {
           type: 'button', onclick: function () { view = 'overdue'; CF.shell.repaint(); }
         }, 'Review them')
@@ -396,6 +396,32 @@
         ])
       ]),
 
+      // A timer left running overnight would otherwise be recorded as the real
+      // duration of the clean and quietly wreck every hourly figure after it.
+      CF.actions.timerLooksForgotten(job) ? el('div.callout.callout--warn.mb-4', [
+        el('strong', 'That timer has been running a long time. '),
+        'It looks like it was left on. ',
+        el('button.linkbtn', {
+          type: 'button',
+          onclick: function () {
+            CF.ui.confirm({
+              title: 'Reset the timer for this clean?',
+              message: 'The recorded time goes back to zero. Nothing else about ' +
+                       'the job changes.',
+              confirmLabel: 'Reset Timer'
+            }).then(function (ok) {
+              if (!ok) return;
+              CF.store.update('jobs', id, { elapsedSeconds: 0, startedAt: null },
+                'Reset timer');
+              CF.ui.toast('Timer reset', {
+                undo: function () { CF.store.undo(); CF.shell.repaint(); }
+              });
+              CF.shell.repaint();
+            });
+          }
+        }, 'Reset it')
+      ]) : null,
+
       U.accessNote(job.notes) ? el('div.mb-4', U.accessNote(job.notes)) : null,
 
       el('div.card', { style: { padding: '20px 20px 8px' } }, [
@@ -448,6 +474,7 @@
       }
       stopTimer();
       var result = CF.actions.completeJob(job.id);
+      if (!result) return;          // the write was refused; the toast explains why
       CF.shell.setFlash({
         kind: 'job-complete',
         jobId: job.id,

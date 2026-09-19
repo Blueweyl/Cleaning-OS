@@ -57,6 +57,17 @@ actually pay — the same total the invoice charges. In the Money tab your
 never yours: it's shown separately as *"Tax collected (not yours)"* so you can
 set it aside. If you don't charge tax, none of this appears.
 
+**Recurring visits keep their shape.** A monthly clean stays on its day of the
+month — the 15th stays the 15th, and a job pinned to the 31st falls back to the
+28th only in February, then returns to the 31st. Finishing a job late doesn't
+drag the whole schedule back with it, and the next visit is never booked onto a
+date that has already passed.
+
+**Nothing you started can get lost.** If you tap Start and never close the job,
+it turns up under **Needs Closing** on the Jobs screen and on your Home screen
+the next morning. If the timer was left running overnight, the clean screen says
+so and offers to reset it rather than recording a 20-hour job.
+
 **Grow only shows real opportunities.** A client appears under "ready to rebook"
 because their actual cleaning interval has lapsed with nothing booked ahead, not
 because a counter ticked over.
