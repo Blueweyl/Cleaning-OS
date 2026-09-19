@@ -11,6 +11,9 @@
   --brand-hover:      #2E5BC0;
   --brand-active:     #2850AB;
   --brand-tint:       #EEF3FC;  /* chips, active nav, avatars          */
+  /* Brand at 4.69 on white and 4.21 on its own tint reads as a link but misses
+     AA as text. Fills keep --brand; anything that is *words* uses this. */
+  --brand-text:       #3A66C8;
   --brand-tint-2:     #F5F8FE;  /* selected rows, info panels          */
   --brand-border:     #DCE6FA;
   --brand-on-dark:    #8FA6D9;  /* brand text on the ink surface       */
@@ -20,7 +23,9 @@
   --ink-text:         #FFFFFF;
   --ink-muted:        #9AA7BC;
   --ink-muted-2:      #8B96A8;
-  --ink-faint:        #6B7C9C;
+  /* 3.72 on the ink panel — below AA. #8E9DBA measures 5.73 and still reads
+     as the quietest thing on a dark card. */
+  --ink-faint:        #8E9DBA;
   --ink-body:         #C7D2E8;
   --ink-rule:         rgba(255, 255, 255, 0.12);
   --ink-rule-soft:    rgba(255, 255, 255, 0.10);
@@ -31,8 +36,13 @@
   --text:             #1B2430;  /* primary copy                        */
   --text-2:           #334155;  /* secondary copy                      */
   --text-3:           #475569;  /* field labels                        */
-  --text-muted:       #64748B;  /* supporting copy                     */
-  --text-faint:       #94A3B8;  /* meta, timestamps, placeholders      */
+  /* Measured against every surface these sit on (white, page, chip and
+     brand tint) at WCAG AA. The old values were 4.44 and 2.39 against the page
+     background — the faint one was effectively unreadable in daylight, which is
+     where this app is used. Five distinct steps are preserved: 14.6 / 9.7 / 7.1
+     / 5.7 / 4.8. */
+  --text-muted:       #556377;  /* supporting copy                     */
+  --text-faint:       #5F6E85;  /* meta, timestamps, placeholders      */
 
   --surface:          #FFFFFF;
   --surface-sunken:   #FAFBFD;  /* inputs, secondary buttons           */
@@ -50,15 +60,16 @@
   --ok-bg:            #F0F9F1;
   --ok-border:        #D8EEDA;
   --ok-text:          #237A42;
-  --ok-mid:           #2F8F52;
-  --ok-soft:          #5C9E76;
+  --ok-mid:           #23703E;
+  --ok-soft:          #2C6B45;
   --ok-bright:        #6FCF97;  /* profit figures on the ink surface   */
   --ok-dot:           #3E9E64;
 
   /* ---- Semantic: warning --------------------------------------------- */
   --warn-bg:          #FFF8ED;
   --warn-border:      #F3E4C3;
-  --warn-text:        #B8790C;
+  /* 3.44 on its own tint. Solo cleaners read these badges in daylight. */
+  --warn-text:        #8C5A06;
   --warn-dark:        #966008;
   --warn-deep:        #7A5A16;
   --warn-dot:         #E0B23C;
@@ -66,7 +77,7 @@
 
   /* ---- Semantic: danger ---------------------------------------------- */
   --bad-bg:           #FDF3F2;
-  --bad-text:         #C0453F;
+  --bad-text:         #B03A34;
   --bad-dot:          #E0524C;
 
   /* ---- Spacing scale (4px base) --------------------------------------- */

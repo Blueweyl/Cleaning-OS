@@ -481,6 +481,7 @@
       build: function (close) {
         input = el('input.searchbox__input', {
           type: 'search', autofocus: true,
+          ariaLabel: 'Search clients, jobs, quotes and invoices',
           placeholder: 'Search clients, jobs, quotes, invoices…',
           'aria-label': 'Search',
           oninput: function (e) { run(e.target.value); },

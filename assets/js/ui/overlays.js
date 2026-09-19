@@ -162,11 +162,14 @@
       variant: 'right',
       onClose: config.onClose,
       build: function (close) {
+        // Named by the heading people can actually see, so the two can never
+        // drift apart.
+        var titleId = 'drawer-title-' + Math.random().toString(36).slice(2, 7);
         return el('div.drawer.anim-slide-left', {
-          role: 'dialog', 'aria-modal': 'true', 'aria-label': config.title || 'Panel'
+          role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId
         }, [
           el('div.drawer__head', [
-            el('h2.drawer__title', config.title || ''),
+            el('h2.drawer__title', { id: titleId }, config.title || 'Panel'),
             el('button.iconbtn', {
               type: 'button', 'aria-label': 'Close', onclick: function () { close(); }
             }, '✕')

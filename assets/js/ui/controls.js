@@ -32,6 +32,11 @@
         .filter(Boolean).join(' ') || null
     };
 
+    // A placeholder is not a label: it disappears the moment someone types and
+    // screen readers are not obliged to announce it. A field with no visible
+    // label needs a real accessible name.
+    if (config.ariaLabel) props['aria-label'] = config.ariaLabel;
+
     if (!config.multiline && config.type !== 'select') props.type = config.type || 'text';
     if (config.inputmode) props.inputmode = config.inputmode;
     if (config.min !== undefined) props.min = config.min;

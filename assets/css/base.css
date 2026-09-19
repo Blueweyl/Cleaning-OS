@@ -18,7 +18,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-a { color: var(--brand); text-decoration: none; }
+a { color: var(--brand-text); text-decoration: none; }
 a:hover { color: var(--brand-hover); }
 
 button, input, select, textarea {

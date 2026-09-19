@@ -78,7 +78,7 @@
             config.primary ? el('button.btn.btn--sm', {
               type: 'button',
               style: { background: 'var(--brand-tint-2)', border: '1px solid var(--brand-border)',
-                       color: 'var(--brand)' },
+                       color: 'var(--brand-text)' },
               onclick: config.primary.onClick
             }, config.primary.label) : null,
             el('button.btn.btn--secondary.btn--sm', {

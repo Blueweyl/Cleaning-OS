@@ -25,7 +25,7 @@
 .onboard__step.is-done { background: var(--brand); }
 
 .onboard__eyebrow {
-  font-size: 13px; font-weight: 700; color: var(--brand);
+  font-size: 13px; font-weight: 700; color: var(--brand-text);
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 .onboard__title { font-size: var(--t-2xl); font-weight: 800; margin-top: 6px;
@@ -84,7 +84,7 @@
   font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
   color: var(--brand-on-dark); text-transform: uppercase;
 }
-.quote__basis { font-size: 12px; color: var(--ink-faint); margin-top: var(--s-1); }
+.quote__basis { font-size: 12px; color: var(--ink-muted); margin-top: var(--s-1); }
 
 .quote__price {
   font-size: var(--t-hero); font-weight: 800; margin-top: var(--s-2);

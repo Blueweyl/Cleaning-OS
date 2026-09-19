@@ -56,6 +56,7 @@
 
     var search = U.field({
       label: null, value: term, type: 'search',
+      ariaLabel: 'Search clients by name, phone or address',
       placeholder: 'Search name, phone or address…',
       onInput: function (v) { term = v; repaintRows(); }
     });

@@ -78,6 +78,12 @@ have, or adding a second record for a client you already have, both get a warnin
 that explains the consequence — and both let you go ahead anyway. It's your
 business.
 
+**Readable in daylight, usable one-handed.** Every piece of text meets WCAG AA
+contrast against the surface it sits on, and every button, link and icon has a
+44px touch target even where it looks smaller — because this app gets used
+standing in someone's kitchen, on a phone, often in a hurry. It works with a
+keyboard, with a screen reader, and at 200% text zoom without breaking.
+
 **Grow only shows real opportunities.** A client appears under "ready to rebook"
 because their actual cleaning interval has lapsed with nothing booked ahead, not
 because a counter ticked over.
