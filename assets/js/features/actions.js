@@ -92,6 +92,8 @@
   var MAX_AMOUNT = 10000000;
   // A cleaning job measured in more than a fortnight of minutes is a typo.
   var MAX_MINUTES = 20160;
+  // Ten years of credit is already far past any real payment term.
+  var MAX_TERM_DAYS = 3650;
 
   function money(value) {
     var n = Number(value);
@@ -646,6 +648,13 @@
     return Math.min(rate, 100);
   }
 
+  /** A day count from settings: honour 0, fall back only when it is unusable. */
+  function terms(value, fallback) {
+    var n = Number(value);
+    if (!isFinite(n) || n < 0) return fallback;
+    return Math.min(Math.round(n), MAX_TERM_DAYS);
+  }
+
   function createInvoiceForJob(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
@@ -697,7 +706,10 @@
       taxAgreedAtQuote: agreed !== null,
       total: Math.round((subtotal + tax) * 100) / 100,
       issueDate: F().today(),
-      dueDate: F().addDays(F().today(), s.invoiceTermsDays || 14),
+      // `|| 14` meant a stored 0 silently became a fortnight, so Settings read
+      // "0 days" while the invoice fell due two weeks later. Zero is a real
+      // answer here — due on issue.
+      dueDate: F().addDays(F().today(), terms(s.invoiceTermsDays, 14)),
       payments: [],
       notes: ''
     }, 'Create invoice', {

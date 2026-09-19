@@ -91,7 +91,13 @@
 
   function addDays(key, days) {
     var d = fromKey(key) || new Date();
-    d.setDate(d.getDate() + days);
+    var n = Number(days);
+    // An absurd step pushes the Date past the range it can represent, and
+    // toKey then produced the string "NaN-NaN-NaN" — which got stored on
+    // invoices as a due date. A step that cannot land on a real day is no step.
+    if (!isFinite(n)) return toKey(d);
+    d.setDate(d.getDate() + Math.round(n));
+    if (isNaN(d.getTime())) return toKey(fromKey(key) || new Date());
     return toKey(d);
   }
 

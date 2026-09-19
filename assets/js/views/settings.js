@@ -88,7 +88,7 @@
         row('Invoice terms', F.plural(db.settings.invoiceTermsDays, 'day'), function () {
           editNumber('Invoice terms (days)', db.settings.invoiceTermsDays, function (v) {
             CF.store.commit('Edit terms', function (d) { d.settings.invoiceTermsDays = v; });
-          });
+          }, null, 3650);
         }),
         row('Your hourly cost', F.money(db.settings.hourlyCost), function () {
           editNumber('Your hourly cost', db.settings.hourlyCost, function (v) {
@@ -141,13 +141,13 @@
           editNumber('Nudge unanswered quotes after (days)', db.settings.quoteFollowUpDays,
             function (v) {
               CF.store.commit('Edit timing', function (d) { d.settings.quoteFollowUpDays = v; });
-            });
+            }, null, 365);
         }),
         row('Rebook grace period', F.plural(db.settings.rebookGraceDays, 'day'), function () {
           editNumber('Days past due before "ready to rebook"', db.settings.rebookGraceDays,
             function (v) {
               CF.store.commit('Edit timing', function (d) { d.settings.rebookGraceDays = v; });
-            });
+            }, null, 365);
         }),
         row('Referral offer', db.settings.referralOffer || 'Not set', function () {
           editText('Referral thank-you offer', db.settings.referralOffer, function (v) {
@@ -442,7 +442,7 @@
       return Math.min(n, cap);
     }
 
-    function editNumber(label, value, onSave, hint) {
+    function editNumber(label, value, onSave, hint, cap) {
       var next = value;
       CF.ui.modal({
         size: 'sm', title: label,
@@ -460,7 +460,17 @@
               type: 'button',
               onclick: function () {
                 var n = Number(next);
-                if (isNaN(n) || n < 0) { CF.ui.toast('Enter a number', { tone: 'bad' }); return; }
+                // isNaN lets Infinity through: 1e999 passed both checks and was
+                // saved, and as an invoice term it produced a due date of
+                // "NaN-NaN-NaN". An upper bound keeps the figure meaningful.
+                var top = cap || 1000000;
+                if (!isFinite(n) || n < 0) {
+                  CF.ui.toast('Enter a number', { tone: 'bad' }); return;
+                }
+                if (n > top) {
+                  CF.ui.toast('That is too large — the most is ' + top, { tone: 'bad' });
+                  return;
+                }
                 onSave(n); closeModal(); paint(); CF.shell.repaint();
               }
             }, 'Save')

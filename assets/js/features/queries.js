@@ -350,13 +350,21 @@
 
   function quotes() { return S().all('quotes'); }
 
+  /** A day count from settings: 0 means 0, anything unusable means the default. */
+  function dayCount(value, fallback) {
+    var n = Number(value);
+    return isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+  }
+
   function quotesByStatus(status) {
     return quotes().filter(function (q) { return q.status === status; });
   }
 
   /** Sent, unanswered, and old enough to be worth a nudge. */
   function staleQuotes() {
-    var days = S().get().settings.quoteFollowUpDays || 3;
+    // A stored 0 is a real choice — nudge straight away — but `|| 3` turned it
+    // back into three days while Settings still displayed "0 days".
+    var days = dayCount(S().get().settings.quoteFollowUpDays, 3);
     var t = F().today();
     return quotesByStatus('sent').filter(function (q) {
       var since = q.sentDate || q.date;
@@ -522,7 +530,7 @@
    * One-time clients count once they are 45 days cold.
    */
   function readyToRebook() {
-    var grace = S().get().settings.rebookGraceDays || 7;
+    var grace = dayCount(S().get().settings.rebookGraceDays, 7);
     var t = F().today();
 
     return activeClients().map(function (c) {

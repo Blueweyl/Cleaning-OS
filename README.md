@@ -199,6 +199,12 @@ job, on the client and on the invoice itself — not only on the one screen you
 happened to open. CleanFlow never rewrites a figure you billed; it points at the
 disagreement and leaves the decision to you.
 
+**Your settings mean what they say.** Setting a follow-up window or invoice terms
+to 0 does exactly that — nudge straight away, due on issue — instead of quietly
+falling back to the default while the screen still reads "0 days". Day counts have
+sensible upper limits, so a mistyped figure can't produce an invoice due date that
+isn't a date.
+
 **A job can't be booked for a negative amount.** A service saved with an odd base
 price, or a figure arriving from an edited file, is floored at zero and capped
 rather than turning up on your dashboard as "-$50".
