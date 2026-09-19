@@ -421,7 +421,7 @@
         }, '🔍'),
         el('button.btn.btn--sm.desktop-only', {
           type: 'button',
-          style: { background: 'var(--brand-tint)', color: 'var(--brand)', fontWeight: '800' },
+          style: { background: 'var(--brand-tint)', color: 'var(--brand-text)', fontWeight: '800' },
           onclick: openQuickAdd
         }, '+ New'),
         el('button.avatarbtn', {

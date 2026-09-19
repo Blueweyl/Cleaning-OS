@@ -243,7 +243,7 @@
           el('details', [
             el('summary', {
               style: { cursor: 'pointer', fontSize: '13px', fontWeight: '700',
-                       color: 'var(--brand)', padding: '8px 0', listStyle: 'none' }
+                       color: 'var(--brand-text)', padding: '8px 0', listStyle: 'none' }
             }, 'More actions'),
             el('div.grid.grid-2.mt-3', [
               el('button.btn.btn--quiet.btn--sm', {
@@ -360,7 +360,7 @@
 
     var progress = Q.checklistProgress(job);
     var timerNode = el('div', {
-      style: { fontSize: '22px', fontWeight: '800', color: 'var(--brand)',
+      style: { fontSize: '22px', fontWeight: '800', color: 'var(--brand-text)',
                fontVariantNumeric: 'tabular-nums' },
       role: 'timer', 'aria-label': 'Time on this job'
     }, F.duration(CF.actions.elapsedSeconds(job)));
@@ -428,7 +428,7 @@
         el('div.row.between.mb-3', { style: { alignItems: 'baseline' } }, [
           el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--text-2)' } },
             progress.done + '/' + progress.total + ' Complete'),
-          el('div', { style: { fontSize: '14px', fontWeight: '800', color: 'var(--brand)' } },
+          el('div', { style: { fontSize: '14px', fontWeight: '800', color: 'var(--brand-text)' } },
             progress.percent + '%')
         ]),
         el('div.mb-5', U.progress(progress.percent)),

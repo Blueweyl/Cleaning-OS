@@ -28,7 +28,7 @@ button, input, select, textarea {
 
 /* Visible focus everywhere. Never remove this without a replacement. */
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }

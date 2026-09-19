@@ -31,6 +31,14 @@
   --brand-border:     #2E3F62;
   --brand-on-dark:    #8FB0F5;
 
+  /* The light theme's focus glow is a pale tint. Dropped into the dark theme
+     unchanged it became a navy glow on a navy card — 1.09 against the surface,
+     which is to say invisible. These are the dark equivalents, measured
+     against what actually surrounds them. */
+  --focus-ring:       #8FB0F5;  /* 7.5 on a card, vs 3.47 for raw brand */
+  --focus-border:     #8FB0F5;
+  --focus-glow:       #5C82D8;  /* 4.37 against a card                  */
+
   /* ---- Ink surface -----------------------------------------------------
      The hero card is the one thing that was already dark. In a dark theme it
      has to become *lighter* than the page or it stops reading as raised.    */
@@ -91,6 +99,7 @@
 
   /* ---- Semantic: danger ------------------------------------------------- */
   --bad-bg:           #2A1615;
+  --bad-border:       #5A2B28;
   --bad-text:         #F08A84;
   --bad-fill:         #C0453F;
   --bad-dot:          #E86A63;

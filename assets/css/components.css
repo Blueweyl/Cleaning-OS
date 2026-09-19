@@ -107,8 +107,10 @@
 }
 .callout--ok   { background: var(--ok-bg);    border: 1px solid var(--ok-border);    color: var(--ok-text); font-weight: 600; }
 .callout--warn { background: var(--warn-bg);  border: 1px solid var(--warn-border);  color: var(--warn-dark); }
-.callout--info { background: var(--brand-tint-2); border: 1px solid var(--brand-border); color: #345691; }
-.callout--bad  { background: var(--bad-bg);   border: 1px solid #F6DDDB;             color: var(--bad-text); }
+/* Was a hard-coded #345691, which stayed navy-on-navy in the dark theme
+   at 2.26:1. Every colour in here has to come from a token. */
+.callout--info { background: var(--brand-tint-2); border: 1px solid var(--brand-border); color: var(--brand-text); }
+.callout--bad  { background: var(--bad-bg);   border: 1px solid var(--bad-border);    color: var(--bad-text); }
 
 .callout__title { font-size: var(--t-sm); font-weight: 700; margin-bottom: var(--s-1); }
 .callout--warn .callout__title { color: var(--warn-text); }
@@ -196,8 +198,8 @@
 .input::placeholder, .textarea::placeholder { color: var(--text-faint); }
 .input:focus, .select:focus, .textarea:focus {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-tint);
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 3px var(--focus-glow);
 }
 .input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--bad-text); }
 .textarea { min-height: 88px; resize: vertical; line-height: 1.5; }

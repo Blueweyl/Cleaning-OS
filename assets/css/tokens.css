@@ -18,6 +18,12 @@
   --brand-border:     #DCE6FA;
   --brand-on-dark:    #8FA6D9;  /* brand text on the ink surface       */
 
+  /* Focus. Kept as its own token because the ring has to contrast with
+     whatever sits behind it, and that is a different colour in each theme. */
+  --focus-ring:       #3E6FD9;  /* :focus-visible outline               */
+  --focus-border:     #3E6FD9;  /* a focused input's own border         */
+  --focus-glow:       #EEF3FC;  /* the soft ring around a focused input */
+
   /* ---- Ink (dark surface used for hero cards + toasts) ---------------- */
   --ink:              #1B2430;
   --ink-text:         #FFFFFF;
@@ -82,6 +88,7 @@
 
   /* ---- Semantic: danger ---------------------------------------------- */
   --bad-bg:           #FDF3F2;
+  --bad-border:       #F6DDDB;
   --bad-text:         #B03A34;
   --bad-fill:         #B03A34;  /* white text sits on this — see --ok-fill */
   --bad-dot:          #E0524C;
