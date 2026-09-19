@@ -305,10 +305,54 @@
   }
 
   /** Swap the current database for a fresh demo. Destructive by design. */
+  /** Which collections hold sample records the demo invents. */
+  var SEEDED = ['clients', 'jobs', 'invoices', 'quotes', 'expenses'];
+
+  /**
+   * Mark every sample record as sample.
+   *
+   * Someone exploring the demo will book a real job or add a real client to try
+   * it out — and "Start My Business" used to delete the lot while telling them
+   * "nothing real is lost". Stamping the demo means their own work can be told
+   * apart from it and carried across.
+   */
+  function stamp(db) {
+    SEEDED.forEach(function (key) {
+      (db[key] || []).forEach(function (row) { if (row) row._demo = true; });
+    });
+    return db;
+  }
+
+  /**
+   * Records the person added themselves while the demo was loaded.
+   *
+   * Anything the app writes goes through `store.insert`, which stamps
+   * `createdAt`; the demo's sample records are literals and carry neither that
+   * nor `_demo`. Both signals are checked so a demo loaded by an older build,
+   * which has no `_demo` marks, is still recognised as sample data.
+   */
+  function ownWork(db) {
+    var out = {};
+    SEEDED.forEach(function (key) {
+      out[key] = (db[key] || []).filter(function (row) {
+        return row && !row._demo && !!row.createdAt;
+      });
+    });
+    return out;
+  }
+
+  function ownWorkCount(db) {
+    var own = ownWork(db);
+    return SEEDED.reduce(function (a, k) { return a + own[k].length; }, 0);
+  }
+
   function load() {
-    CF.store.replace(build(), 'Load demo data');
+    CF.store.replace(stamp(build()), 'Load demo data');
     return CF.store.flush();
   }
 
-  CF.demo = { build: build, load: load };
+  CF.demo = {
+    build: build, load: load,
+    ownWork: ownWork, ownWorkCount: ownWorkCount, SEEDED: SEEDED
+  };
 })(window.CF = window.CF || {});

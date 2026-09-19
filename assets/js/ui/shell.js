@@ -377,19 +377,65 @@
     ]);
   }
 
+  /**
+   * Leave the demo and set up for real.
+   *
+   * People try the app out properly before committing: they add their own
+   * client, book a real job, record a real payment — all while the demo is
+   * still loaded. This used to replace the whole database with an empty one
+   * while the dialog assured them "nothing real is lost". It was: their client,
+   * their job, their invoice and their payment, with no undo offered and no
+   * mention that it had happened.
+   *
+   * The sample records are cleared; anything they added themselves comes with
+   * them. The dialog says which of the two is about to happen.
+   */
   function startRealBusiness() {
+    var db = CF.store.get();
+    var own = CF.demo.ownWork(db);
+    var count = CF.demo.ownWorkCount(db);
+
     CF.ui.confirm({
       title: 'Start your own business?',
-      message: 'The demo data is cleared and CleanFlow walks you through a two-minute setup. ' +
-               'Nothing here is yours yet, so nothing real is lost.',
-      confirmLabel: 'Start Fresh'
+      message: count
+        ? 'The ' + CF.fmt.plural(count, 'record') + ' you added yourself ' +
+          (count === 1 ? 'is' : 'are') + ' kept — the sample clients, jobs and ' +
+          'invoices are cleared. Then CleanFlow walks you through a two-minute setup.'
+        : 'The demo data is cleared and CleanFlow walks you through a two-minute ' +
+          'setup. You have not added anything of your own, so nothing real is lost.',
+      confirmLabel: count ? 'Keep My Work' : 'Start Fresh'
     }).then(function (ok) {
       if (!ok) return;
-      CF.store.replace(CF.schema.emptyDatabase(), 'Start fresh');
+
+      var fresh = CF.schema.emptyDatabase();
+      // Carry their own records across, oldest first so ids and numbering read
+      // in the order they were created.
+      CF.demo.SEEDED.forEach(function (key) {
+        fresh[key] = (own[key] || []).slice();
+      });
+      // Document numbers must not restart on top of invoices already issued.
+      fresh.counters = Object.assign({}, fresh.counters, {
+        invoice: highestOf(fresh.invoices, fresh.counters.invoice),
+        quote: highestOf(fresh.quotes, fresh.counters.quote)
+      });
+
+      CF.store.replace(fresh, 'Start fresh');
       CF.views.onboarding.reset();
       CF.router.go('#/home');
       repaint();
+      if (count) {
+        CF.ui.toast(CF.fmt.plural(count, 'record') + ' kept from your trial run');
+      }
     });
+  }
+
+  function highestOf(rows, current) {
+    var top = Number(current) || 100;
+    (rows || []).forEach(function (r) {
+      var n = parseInt(r && r.number, 10);
+      if (isFinite(n) && n > top) top = n;
+    });
+    return top;
   }
 
   function topbar(route) {

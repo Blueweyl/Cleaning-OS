@@ -215,6 +215,11 @@ Only the two most recent set-aside copies are kept — they're whole databases, 
 keeping every one of them would eventually fill this browser's storage and take
 the instant-save copy down with it.
 
+**Trying it out for real doesn't cost you the work.** Add your own client or book
+a real job while the demo is loaded, then press *Start My Business* — the sample
+data goes, and what you added yourself comes with you, invoice numbering
+included. The dialog tells you which it's about to do.
+
 **Damaged data is recovered, not written off.** The usual cause of corruption is a
 save that got cut off part-way — and the start of the file is still perfectly
 good. CleanFlow reads back whatever survived and offers *Recover What You Can*,
