@@ -132,9 +132,17 @@ shape of every financial record before anything is shown: a payment list that
 isn't a list, a total that isn't a number, a date that isn't a date. Figures that
 *are* readable are left exactly as they are — your records are yours — but
 anything unreadable is repaired rather than being allowed to turn your revenue,
-tax or profit into a blank. And a backup holding a real business is always
+tax or profit into a blank. If an invoice's recorded total doesn't match the lines
+it's made of — which really only happens when a file has been edited outside
+CleanFlow — the invoice says so on screen and the figure is left exactly as it
+was, because correcting a bill is your call and not the app's. And a backup holding a real business is always
 recognised as one, so a restore never drops you back to the welcome screen with
 your work hidden behind it.
+
+**A wrong device clock can't eat your hours.** If the clock jumps backwards
+mid-clean — daylight saving, a manual correction, a flat battery — the time
+already on the timer is kept. It's never reduced, and never recorded as a
+negative.
 
 **Money can only go in once, and only what's owed.** A payment has to be a real
 amount above zero and can't exceed what's still outstanding — checked when it's
@@ -190,7 +198,10 @@ backup*, or *Start over*, and nothing is written until you choose.
 
 **Only one tab at a time saves.** If you open CleanFlow twice, the second tab goes
 read-only with a banner and a *Use This Tab* button, so two copies can't overwrite
-each other's work.
+each other's work. Pressing *Use This Tab* re-reads your data from the device
+first, so anything the other tab did in the meantime is picked up rather than
+being written over — a payment recorded in one tab is never lost by switching to
+the other.
 
 **Damaged data is recovered, not written off.** The usual cause of corruption is a
 save that got cut off part-way — and the start of the file is still perfectly

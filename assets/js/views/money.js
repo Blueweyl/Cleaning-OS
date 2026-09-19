@@ -458,6 +458,25 @@
           'This invoice has been paid ' + F.money(over) + ' more than its total. ' +
           'Remove or correct a payment below, or refund the difference.') : null,
 
+        // A restored file can arrive self-contradictory. CleanFlow will not
+        // quietly rewrite a billed figure, so it points at the disagreement
+        // instead and leaves the decision where it belongs.
+        (function () {
+          var off = Q.invoiceInconsistent(inv);
+          if (!off) return null;
+          return el('div.callout.callout--warn.mt-3', [
+            el('div', { style: { fontWeight: '700' } }, 'This invoice does not add up'),
+            el('div.mt-1', 'Its lines come to ' + F.money(off.lines) +
+              (off.tax > 0 ? ' plus ' + F.money(off.tax) + ' ' +
+                (CF.store.get().settings.taxLabel || 'tax') : '') +
+              ', but the total recorded on it is ' + F.money(off.total) + '.'),
+            el('div.mt-1', 'The figure you were billed has been left exactly as it ' +
+              'was — nothing has been changed. This usually means the file was ' +
+              'edited outside CleanFlow. Check it against your own copy of the ' +
+              'invoice before chasing the balance.')
+          ]);
+        })(),
+
         (inv.payments || []).length ? el('div.mt-4', [
           el('div.eyebrow.mb-2', 'Payments'),
           el('div.stack.stack-2', inv.payments.map(function (p) {

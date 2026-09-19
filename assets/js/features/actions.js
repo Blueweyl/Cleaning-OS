@@ -343,12 +343,22 @@
     }, 'Start job');
   }
 
+  /**
+   * Bank the running time and stop the clock.
+   *
+   * This used to do its own arithmetic, which meant it did not share
+   * `elapsedSeconds`' guard against a clock that has moved backwards. A device
+   * whose clock jumped back a day — a DST correction, a manual fix, a flat
+   * battery — banked *minus* 21 hours over the two real hours worked, and the
+   * cleaner's time was gone. One source of truth for the sum now.
+   */
   function pauseJob(id) {
     var job = S().find('jobs', id);
     if (!job || !job.startedAt) return job;
-    var elapsed = (job.elapsedSeconds || 0) +
-                  Math.floor((Date.now() - new Date(job.startedAt).getTime()) / 1000);
-    return S().update('jobs', id, { startedAt: null, elapsedSeconds: elapsed }, 'Pause timer');
+    return S().update('jobs', id, {
+      startedAt: null,
+      elapsedSeconds: elapsedSeconds(job)
+    }, 'Pause timer');
   }
 
   /**

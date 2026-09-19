@@ -65,6 +65,30 @@
       });
   }
 
+  /**
+   * Re-read the database from disk, discarding this tab's in-memory copy.
+   *
+   * A read-only tab is holding a snapshot from whenever it opened. Handing it
+   * the write lock without this let it save that stale snapshot straight over
+   * the other tab's newer work — a payment recorded in the writing tab simply
+   * vanished, because the tab that took over had never seen it.
+   *
+   * Nothing is written here, so a failed read costs nothing: the tab keeps the
+   * copy it already had and the caller is told it could not refresh.
+   */
+  function refreshFromDisk() {
+    return CF.storage.load().then(function (result) {
+      if (!result || !result.ok) return false;
+      db = CF.schema.migrate(result.data);
+      // The undo history describes edits to a database this tab no longer
+      // holds; keeping it would let one Undo reinstate the stale snapshot.
+      undoStack.length = 0;
+      invalidateDerived();
+      notify();
+      return true;
+    }).catch(function () { return false; });
+  }
+
   /* ---- Safety lock --------------------------------------------------------
      While locked, nothing is written to disk. The user is told what happened
      and offered the only two safe ways out: restore a backup, or start fresh
@@ -387,6 +411,7 @@
   CF.store = {
     init: init, get: get, subscribe: subscribe, notify: notify,
     commit: commit, transaction: transaction, undo: undo, canUndo: canUndo, replace: replace,
+    refreshFromDisk: refreshFromDisk,
     all: all, find: find, insert: insert, update: update,
     remove: remove, restore: restore,
     nextNumber: nextNumber, logActivity: logActivity,

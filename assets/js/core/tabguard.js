@@ -123,14 +123,32 @@
     window.addEventListener('beforeunload', releaseLock);
   }
 
-  /** Become the writing tab. `quiet` skips telling the other tab, for takeover
-      after it has already gone away. */
+  /**
+   * Become the writing tab. `quiet` skips telling the other tab, for takeover
+   * after it has already gone away.
+   *
+   * The database is re-read from disk first. This tab has been sitting on the
+   * copy it loaded when it opened, and the tab that was writing has moved on
+   * since: without the refresh, the first save after a takeover wrote this
+   * stale snapshot over the other tab's newer work, and a payment recorded
+   * there was simply gone. The lock is only granted once the refresh settles,
+   * so nothing can be written from the old copy in between.
+   */
   function takeOver(quiet) {
-    writeLock();
-    if (!quiet && channel) {
-      try { channel.postMessage({ type: 'claim', from: tabId }); } catch (e) {}
-    }
-    setWriter(true);
+    var claim = function () {
+      writeLock();
+      if (!quiet && channel) {
+        try { channel.postMessage({ type: 'claim', from: tabId }); } catch (e) {}
+      }
+      setWriter(true);
+    };
+
+    if (isWriter || !CF.store || !CF.store.refreshFromDisk) { claim(); return; }
+
+    // A refresh that fails leaves this tab on the copy it already had, which is
+    // the same position it was in a moment ago — so it still takes the lock
+    // rather than being left unable to write at all.
+    CF.store.refreshFromDisk().then(claim, claim);
   }
 
   function canWrite() { return isWriter; }

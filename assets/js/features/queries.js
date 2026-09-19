@@ -280,6 +280,34 @@
   }
 
   /**
+   * Does this invoice's own total disagree with the lines it is made of?
+   *
+   * Restoring never rewrites a figure that reads as a number, because an
+   * invoice is a record of what was billed and not ours to correct. But a file
+   * that has been hand-edited, truncated mid-write or merged by a sync tool can
+   * arrive self-contradictory, and saying nothing about it is how someone
+   * chases the wrong balance for a month. Reported here so the screen can point
+   * at it and let the owner decide.
+   *
+   * Returns null when the invoice adds up, or by how much it is out.
+   */
+  function invoiceInconsistent(inv) {
+    if (!inv || !Array.isArray(inv.lines) || !inv.lines.length) return null;
+    var lines = inv.lines.reduce(function (a, l) { return a + safeAmount(l && l.amount); }, 0);
+    var subtotal = safeAmount(inv.subtotal);
+    var tax = safeAmount(inv.tax);
+    var total = safeAmount(inv.total);
+    var expected = Math.round((lines + tax) * 100) / 100;
+    var out = {
+      lines: cents(lines), subtotal: cents(subtotal), tax: cents(tax),
+      total: cents(total), expected: expected,
+      subtotalOff: Math.abs(subtotal - lines) > 0.005,
+      totalOff: Math.abs(total - expected) > 0.005
+    };
+    return (out.subtotalOff || out.totalOff) ? out : null;
+  }
+
+  /**
    * Status is always derived, never stored — so it cannot go stale while
    * the app sits closed over a weekend.
    */
@@ -682,7 +710,7 @@
     jobsForClient: jobsForClient, jobTotal: jobTotal, checklistProgress: checklistProgress,
     sortByWhen: sortByWhen,
     invoices: invoices, invoiceReceived: invoiceReceived, invoiceRemaining: invoiceRemaining,
-    invoiceOverpaid: invoiceOverpaid,
+    invoiceOverpaid: invoiceOverpaid, invoiceInconsistent: invoiceInconsistent,
     invoiceStatus: invoiceStatus, openInvoices: openInvoices, overdueInvoices: overdueInvoices,
     outstandingTotal: outstandingTotal,
     quotes: quotes, quotesByStatus: quotesByStatus, staleQuotes: staleQuotes,
