@@ -90,6 +90,8 @@
    * money, and storing it makes a balance that can never reach zero.
    */
   var MAX_AMOUNT = 10000000;
+  // A cleaning job measured in more than a fortnight of minutes is a typo.
+  var MAX_MINUTES = 20160;
 
   function money(value) {
     var n = Number(value);
@@ -293,6 +295,17 @@
 
     if (!job.checklist || !job.checklist.length) job.checklist = checklistFor(job.serviceId);
     job.date = saneDate(job.date, F().today());
+
+    // Every other money action validates its amount; this one took whatever it
+    // was handed. A service saved with a base price of -50 booked jobs at -$50,
+    // which the dashboard then showed as "Standard Cleaning -$50", and Infinity
+    // or 1e20 went in just as readily. A booking is not a refund, so the price
+    // is floored at zero and capped like any other stored amount.
+    job.price = storedAmount(job.price);
+    if (job.estMinutes !== undefined && job.estMinutes !== null) {
+      var mins = Math.round(Number(job.estMinutes));
+      job.estMinutes = isFinite(mins) && mins > 0 ? Math.min(mins, MAX_MINUTES) : null;
+    }
 
     return S().insert('jobs', job, 'Book job', {
       icon: '📅',

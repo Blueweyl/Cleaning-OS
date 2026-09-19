@@ -199,9 +199,14 @@ job, on the client and on the invoice itself — not only on the one screen you
 happened to open. CleanFlow never rewrites a figure you billed; it points at the
 disagreement and leaves the decision to you.
 
+**A job can't be booked for a negative amount.** A service saved with an odd base
+price, or a figure arriving from an edited file, is floored at zero and capped
+rather than turning up on your dashboard as "-$50".
+
 **A tax rate outside 0–100 can't be saved.** Your current rate is kept until you
 enter a valid one, so a mistyped rate can never quietly turn into charging no tax
-at all.
+at all. If a restored file carries an impossible rate, Settings says so next to
+it — invoices cap the tax at 100% whatever the setting says.
 
 **If a backup holds an invoice whose payment history can't be read**, the restore
 says so before you confirm. Those invoices come back showing as unpaid — the safe

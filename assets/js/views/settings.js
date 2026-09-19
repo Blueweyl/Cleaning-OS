@@ -78,8 +78,12 @@
 
       host.appendChild(group('Money', [
         row('Currency', currency.label + ' (' + currency.symbol.trim() + ')', editCurrency),
+        // A rate outside 0-100 cannot be typed in, but a restored or edited file
+        // can carry one. Billing caps it at 100%, so showing a bare "450%" here
+        // tells the owner they are charging something they are not.
         row('Tax', db.settings.taxEnabled
-          ? db.settings.taxLabel + ' ' + db.settings.taxRate + '%'
+          ? db.settings.taxLabel + ' ' + db.settings.taxRate + '%' +
+            (validRate(db.settings.taxRate) ? '' : ' — not valid, tap to fix')
           : 'Off', editTax),
         row('Invoice terms', F.plural(db.settings.invoiceTermsDays, 'day'), function () {
           editNumber('Invoice terms (days)', db.settings.invoiceTermsDays, function (v) {
@@ -420,6 +424,24 @@
       });
     }
 
+    /**
+     * A price or duration typed into a service or add-on.
+     *
+     * These fields used `Number(v) || 0`, which lets a negative through
+     * unchanged and turns 1e999 into Infinity. A service saved that way booked
+     * every later job at a negative or infinite price.
+     */
+    function validRate(v) {
+      var n = Number(v);
+      return isFinite(n) && n >= 0 && n <= 100;
+    }
+
+    function positiveNumber(v, cap) {
+      var n = Number(v);
+      if (!isFinite(n) || n < 0) return 0;
+      return Math.min(n, cap);
+    }
+
     function editNumber(label, value, onSave, hint) {
       var next = value;
       CF.ui.modal({
@@ -483,7 +505,11 @@
     function editTax() {
       var s = CF.store.get().settings;
       var next = { enabled: s.taxEnabled, rate: s.taxRate, label: s.taxLabel };
-      var rateValid = true;
+      // Starting this true meant that opening the editor on a rate a restored
+      // file had left out of range and pressing Save committed it again,
+      // unchanged and unquestioned. It reflects the value on screen from the
+      // outset, so Save is refused until the rate is actually valid.
+      var rateValid = validRate(s.taxRate);
       // Declared out here because the Save handler lives in a sibling closure
       // and has to be able to re-show the error.
       var rateField = null;
@@ -525,6 +551,7 @@
               toggle.querySelector('.checkrow__box').textContent = next.enabled ? '✓' : '';
             }
           });
+          if (!rateValid) rateField.setError('Enter a rate between 0 and 100.');
           return el('div.stack.stack-4', [toggle, rateField.node, labelField.node]);
         },
         actions: function (closeModal) {
@@ -570,11 +597,11 @@
               onInput: function (v) { next.name = v; } }).node,
             CF.ui.field({ label: 'Base price', value: next.basePrice, type: 'number',
               inputmode: 'decimal', prefix: CF.store.get().settings.currencySymbol,
-              onInput: function (v) { next.basePrice = Number(v) || 0; } }).node,
+              onInput: function (v) { next.basePrice = positiveNumber(v, 10000000); } }).node,
             CF.ui.field({ label: 'Typical time (minutes)', value: next.estMinutes, type: 'number',
               inputmode: 'numeric',
               hint: 'Drives the time and profit estimates on quotes.',
-              onInput: function (v) { next.estMinutes = Number(v) || 0; } }).node,
+              onInput: function (v) { next.estMinutes = positiveNumber(v, 20160); } }).node,
             CF.ui.field({ label: 'Checklist', type: 'select', value: next.checklistId,
               options: CF.store.all('checklists').map(function (c) {
                 return { value: c.id, label: c.name };
@@ -617,10 +644,10 @@
               onInput: function (v) { next.name = v; } }).node,
             CF.ui.field({ label: 'Price', value: next.price, type: 'number', inputmode: 'decimal',
               prefix: CF.store.get().settings.currencySymbol,
-              onInput: function (v) { next.price = Number(v) || 0; } }).node,
+              onInput: function (v) { next.price = positiveNumber(v, 10000000); } }).node,
             CF.ui.field({ label: 'Extra time (minutes)', value: next.minutes, type: 'number',
               inputmode: 'numeric',
-              onInput: function (v) { next.minutes = Number(v) || 0; } }).node
+              onInput: function (v) { next.minutes = positiveNumber(v, 20160); } }).node
           ]);
         },
         actions: function (closeModal) {
