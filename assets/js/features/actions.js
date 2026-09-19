@@ -636,7 +636,17 @@
   function createInvoiceForJob(jobId) {
     var job = S().find('jobs', jobId);
     if (!job) return null;
-    if (job.invoiceId) return S().find('invoices', job.invoiceId);
+
+    // Already invoiced: hand back the same invoice rather than issuing a second
+    // one. But the pointer can outlive what it points at — a rescued backup can
+    // bring back a completed job whose invoice the damage destroyed, and a
+    // hand-edited file can do the same. That used to return nothing at all, so
+    // "Create Invoice" sat on the job doing nothing and the work could never be
+    // billed. A pointer to an invoice that is gone is not an invoice.
+    if (job.invoiceId) {
+      var existing = S().find('invoices', job.invoiceId);
+      if (existing) return existing;
+    }
 
     var s = S().get().settings;
     // Amounts come out of stored records, which a restore or a hand-edit can

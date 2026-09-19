@@ -194,6 +194,11 @@ with no bookings yet, or a client you archived, still counts as something to
 warn you about. If a file isn't a genuine CleanFlow backup, it's refused rather
 than imported as junk.
 
+**If a rescue can only save part of a damaged file**, the work it recovers stays
+billable. A finished job whose invoice the damage destroyed will raise a fresh
+one from *Create Invoice* rather than pointing at something that is no longer
+there, so no completed work is stranded unbilled.
+
 **If CleanFlow ever can't read your saved data**, it stops and says so instead of
 starting empty — because an empty database that saves itself over your real one
 is how data actually gets lost. You'll be offered *Try Again*, *Restore from a
