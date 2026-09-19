@@ -68,6 +68,9 @@
         })
       ]));
 
+      /* ---- Appearance ---- */
+      host.appendChild(group('Appearance', [themeRow()]));
+
       /* ---- Money settings ---- */
       var currency = CF.schema.CURRENCIES.filter(function (c) {
         return c.code === db.settings.currency;
@@ -159,6 +162,51 @@
     }
 
     /* ---- building blocks ------------------------------------------------- */
+
+    /**
+     * Theme picker. A segmented control rather than a row-and-modal because
+     * it is the one setting where you want to see the result the instant you
+     * touch it — the whole screen is the preview.
+     */
+    function themeRow() {
+      var host = el('div.seg.seg--outline', {
+        role: 'group', 'aria-label': 'Appearance'
+      });
+      var options = [
+        { value: 'system', label: 'System' },
+        { value: 'light',  label: 'Light' },
+        { value: 'dark',   label: 'Dark' }
+      ];
+
+      function paint() {
+        var picked = CF.theme.choice();
+        CF.dom.clear(host);
+        options.forEach(function (o) {
+          host.appendChild(el('button.seg__item', {
+            type: 'button',
+            // Sized by its own label rather than forced to a third of the
+            // drawer: at 360px an equal split clipped "System" to "Syst…".
+            style: { flex: '1 1 auto', minWidth: 'max-content' },
+            'aria-pressed': picked === o.value ? 'true' : 'false',
+            onclick: function () {
+              CF.theme.set(o.value);
+              paint();
+              // Repaint the app behind the drawer so every screen is already
+              // in the new theme when this closes.
+              CF.shell.repaint();
+            }
+          }, o.label));
+        });
+      }
+      paint();
+
+      return el('div.stack.stack-2', [
+        host,
+        el('div.meta',
+          'System follows your phone or computer. Printed invoices and quotes ' +
+          'always come out on white paper.')
+      ]);
+    }
 
     function group(title, rows) {
       return el('div', [

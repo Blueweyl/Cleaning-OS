@@ -15,6 +15,10 @@
     CF.store.init()
       .then(function () {
         var mode = CF.storage.describe();
+        // The head script painted a theme from the mirror; now that the real
+        // settings are open, let them have the final say — a restored backup
+        // can carry a different choice than this device last used.
+        if (CF.theme) CF.theme.sync();
         CF.shell.mount(root);
         CF.shell.repaint();
 

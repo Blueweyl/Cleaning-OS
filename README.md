@@ -78,6 +78,12 @@ have, or adding a second record for a client you already have, both get a warnin
 that explains the consequence — and both let you go ahead anyway. It's your
 business.
 
+**Dark mode.** Settings → Appearance: **System**, **Light** or **Dark**. System
+follows your phone or computer, including when it switches itself at sunset.
+Your choice is saved with everything else, so it travels in your backups. One
+deliberate exception: invoices and quotes always print on white paper — a dark
+invoice would come out of the printer as a solid block of ink.
+
 **Readable in daylight, usable one-handed.** Every piece of text meets WCAG AA
 contrast against the surface it sits on, and every button, link and icon has a
 44px touch target even where it looks smaller — because this app gets used

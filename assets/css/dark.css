@@ -1,0 +1,136 @@
+/* ==========================================================================
+   CleanFlow — Dark theme
+
+   Only tokens are redefined here. Every component already draws from them, so
+   nothing in components.css or views.css needs a dark-mode branch.
+
+   The theme is applied as data-theme="dark" on <html> by a small script in the
+   head, before the first paint. That means one selector rather than a copy of
+   this whole palette inside a prefers-color-scheme block — and it lets someone
+   choose dark on a device set to light, which a media query alone cannot.
+
+   Every colour here was measured against the surfaces it actually lands on.
+   The text ramp runs 13.8 / 11.0 / 8.4 / 6.5 / 5.5 against a card, so all five
+   steps clear WCAG AA with the same hierarchy the light theme has.
+   ========================================================================== */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---- Brand -----------------------------------------------------------
+     The fill keeps its exact light-mode value: it is the product's identity,
+     white text on it still measures 4.69, and a brand that shifts between
+     themes stops feeling like one brand. Only brand-as-text changes, because
+     #3E6FD9 on a dark card is unreadable.                                  */
+  --brand:            #3E6FD9;
+  --brand-hover:      #4B7BE3;
+  --brand-active:     #5886EC;
+  --brand-tint:       #1B2740;
+  --brand-text:       #8FB0F5;  /* 7.5 on a card, 8.5 on the page        */
+  --brand-tint-2:     #161F31;
+  --brand-border:     #2E3F62;
+  --brand-on-dark:    #8FB0F5;
+
+  /* ---- Ink surface -----------------------------------------------------
+     The hero card is the one thing that was already dark. In a dark theme it
+     has to become *lighter* than the page or it stops reading as raised.    */
+  --ink:              #232F3D;
+  --ink-text:         #FFFFFF;
+  --ink-muted:        #AEBCD0;
+  --ink-muted-2:      #9DABBF;
+  --ink-faint:        #9AA8BD;
+  --ink-body:         #D2DCEC;
+  --ink-rule:         rgba(255, 255, 255, 0.14);
+  --ink-rule-soft:    rgba(255, 255, 255, 0.10);
+  --ink-fill:         rgba(255, 255, 255, 0.07);
+  --ink-stroke:       rgba(255, 255, 255, 0.22);
+
+  /* ---- Neutrals -------------------------------------------------------- */
+  --text:             #E8EDF4;
+  --text-2:           #CBD5E3;
+  --text-3:           #AFBCCD;
+  --text-muted:       #97A5B8;
+  --text-faint:       #8A97AA;
+
+  --surface:          #18212B;
+  --surface-sunken:   #111922;  /* inputs sit *below* the card, not above */
+  --page:             #0D1219;
+  --chip:             #1E2733;
+  --chip-alt:         #242E3C;
+
+  /* Dark UI separates planes with light edges rather than shadow, which is
+     why these are lighter than the surfaces they sit on. */
+  --border:           #2B3543;
+  --border-strong:    #36424F;
+  --border-soft:      #232C38;
+  --border-softer:    #1D2630;
+  --border-dashed:    #3D4859;
+
+  /* ---- Semantic: success ----------------------------------------------- */
+  --ok-bg:            #12241A;
+  --ok-border:        #1F4230;
+  --ok-text:          #6FCF97;
+  --ok-mid:           #63C68C;
+  --ok-soft:          #7FBF9C;
+  --ok-bright:        #7BDCA4;
+  --ok-dot:           #4FBF7D;
+  /* The fill does NOT lighten with the theme: it carries white text, and a
+     pale green behind white is the one combination that is unreadable in
+     either theme. */
+  --ok-fill:          #1F7340;
+
+  /* ---- Semantic: warning ----------------------------------------------- */
+  --warn-bg:          #241C0E;
+  --warn-border:      #4A3A1B;
+  --warn-text:        #E5B75A;
+  --warn-dark:        #EFC46B;
+  --warn-deep:        #D8AE55;
+  --warn-fill:        #8C5A06;  /* stays deep: it carries white text */
+  --warn-dot:         #E0B23C;
+  --warn-dot-hot:     #E8954A;
+
+  /* ---- Semantic: danger ------------------------------------------------- */
+  --bad-bg:           #2A1615;
+  --bad-text:         #F08A84;
+  --bad-fill:         #C0453F;
+  --bad-dot:          #E86A63;
+
+  /* ---- Elevation --------------------------------------------------------
+     A shadow tuned for white does nothing over a dark page. These go deeper
+     and the scrims go heavier so a modal still lifts off its background.    */
+  --shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md:    0 12px 40px -20px rgba(0, 0, 0, 0.75);
+  --shadow-lg:    0 20px 60px -20px rgba(0, 0, 0, 0.80);
+  --shadow-modal: 0 24px 60px -18px rgba(0, 0, 0, 0.85);
+  --shadow-brand: 0 8px 20px -6px rgba(62, 111, 217, 0.55);
+  --shadow-toast: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+  --scrim:        rgba(3, 6, 10, 0.66);
+  --scrim-strong: rgba(3, 6, 10, 0.74);
+}
+
+/* Form controls the browser paints itself — date pickers, the sq ft slider,
+   scrollbars — follow this rather than staying stubbornly light. */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea { color-scheme: dark; }
+
+/* The one place dark must not follow the screen: paper. An invoice or quote
+   printed from a dark theme would come out as a solid block of ink, so
+   printing always falls back to the light palette. */
+@media print {
+  :root[data-theme="dark"] {
+    color-scheme: light;
+    --text: #1B2430; --text-2: #334155; --text-3: #475569;
+    --text-muted: #556377; --text-faint: #5F6E85;
+    --surface: #FFFFFF; --surface-sunken: #FAFBFD; --page: #FFFFFF;
+    --chip: #F5F6F8; --chip-alt: #F1F2F4;
+    --border: #E9EBEF; --border-strong: #E1E5EB;
+    --border-soft: #F0F1F4; --border-softer: #F5F6F8; --border-dashed: #D8DEE7;
+    --brand-text: #3A66C8;
+    --ink: #FFFFFF; --ink-text: #1B2430; --ink-body: #334155;
+    --ink-muted: #556377; --ink-muted-2: #556377; --ink-faint: #5F6E85;
+    --ok-bg: #F0F9F1; --ok-text: #237A42; --ok-mid: #23703E; --ok-soft: #2C6B45;
+    --warn-bg: #FFF8ED; --warn-text: #8C5A06; --warn-dark: #966008;
+    --bad-bg: #FDF3F2; --bad-text: #B03A34;
+  }
+}

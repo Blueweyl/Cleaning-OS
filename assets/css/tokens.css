@@ -63,6 +63,10 @@
   --ok-mid:           #23703E;
   --ok-soft:          #2C6B45;
   --ok-bright:        #6FCF97;  /* profit figures on the ink surface   */
+  /* A *fill* that carries white text, as distinct from --ok-text which is ink
+     on a pale tint. They happen to coincide in this theme; in the dark theme
+     they are near opposites, which is why they are separate tokens. */
+  --ok-fill:          #237A42;
   --ok-dot:           #3E9E64;
 
   /* ---- Semantic: warning --------------------------------------------- */
@@ -72,12 +76,14 @@
   --warn-text:        #8C5A06;
   --warn-dark:        #966008;
   --warn-deep:        #7A5A16;
+  --warn-fill:        #966008;  /* white text sits on this */
   --warn-dot:         #E0B23C;
   --warn-dot-hot:     #E08A3C;
 
   /* ---- Semantic: danger ---------------------------------------------- */
   --bad-bg:           #FDF3F2;
   --bad-text:         #B03A34;
+  --bad-fill:         #B03A34;  /* white text sits on this — see --ok-fill */
   --bad-dot:          #E0524C;
 
   /* ---- Spacing scale (4px base) --------------------------------------- */

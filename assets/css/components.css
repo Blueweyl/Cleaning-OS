@@ -36,7 +36,7 @@
 .btn--ghost { background: transparent; color: var(--brand-text); padding-inline: var(--s-3); }
 .btn--ghost:hover { background: var(--brand-tint); }
 
-.btn--danger { background: var(--bad-text); color: #fff; }
+.btn--danger { background: var(--bad-fill); color: #fff; }
 .btn--danger:hover:not([disabled]) { filter: brightness(0.94); }
 
 .btn--on-ink { background: transparent; color: #fff; border-color: var(--ink-stroke); }
@@ -333,8 +333,9 @@
   font-size: 13px; font-weight: 600; flex-wrap: wrap;
   color: #fff; text-align: center;
 }
-.safety-bar--warn { background: var(--warn-dark); }
-.safety-bar--bad  { background: var(--bad-text); }
+/* Fills, not text tokens: these bars are white text on a solid colour. */
+.safety-bar--warn { background: var(--warn-fill); }
+.safety-bar--bad  { background: var(--bad-fill); }
 
 .demo-banner {
   background: var(--ink); color: #fff;

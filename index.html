@@ -19,6 +19,47 @@
 <link rel="stylesheet" href="assets/css/base.css">
 <link rel="stylesheet" href="assets/css/components.css">
 <link rel="stylesheet" href="assets/css/views.css">
+<link rel="stylesheet" href="assets/css/dark.css">
+
+<!-- Theme, before the first paint.
+
+     This runs inline and synchronously on purpose: choosing the theme from a
+     script that loads with the rest of the app would show a white page for a
+     moment first, which is exactly what someone turning dark mode on does not
+     want to see. It reads the same preference the app stores, falls back to
+     the device setting, and never throws if storage is blocked. -->
+<script>
+(function () {
+  var root = document.documentElement;
+  function systemDark() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+  function resolve(choice) {
+    if (choice === 'dark' || choice === 'light') return choice;
+    return systemDark() ? 'dark' : 'light';
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('cleanflow:theme'); } catch (e) {}
+  var mode = resolve(saved);
+  root.setAttribute('data-theme', mode);
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', mode === 'dark' ? '#0D1219' : '#3E6FD9');
+  // Follow the device while the preference is "system", including a change
+  // made while the app is open.
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onChange = function () {
+      var current = null;
+      try { current = localStorage.getItem('cleanflow:theme'); } catch (e) {}
+      if (current === 'dark' || current === 'light') return;
+      if (window.CF && CF.theme) CF.theme.apply('system');
+      else root.setAttribute('data-theme', systemDark() ? 'dark' : 'light');
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
+})();
+</script>
 </head>
 <body>
 
@@ -44,6 +85,7 @@
 
 <!-- Classic scripts, no modules: this file has to work when it is opened
      straight from a folder (file://), where ES modules are blocked. -->
+<script src="assets/js/core/theme.js"></script>
 <script src="assets/js/core/dom.js"></script>
 <script src="assets/js/core/format.js"></script>
 <script src="assets/js/core/storage.js"></script>

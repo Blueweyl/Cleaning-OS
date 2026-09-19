@@ -30,8 +30,11 @@
       }, opts.undoLabel || 'Undo') : null
     ]);
 
-    if (opts.tone === 'bad') node.style.background = 'var(--bad-text)';
-    if (opts.tone === 'ok') node.style.background = 'var(--ok-text)';
+    // The fill tokens, not the text ones: a toast is white text on a solid
+    // colour, and in the dark theme --ok-text/--bad-text are the pale versions
+    // meant for ink on a tint.
+    if (opts.tone === 'bad') node.style.background = 'var(--bad-fill)';
+    if (opts.tone === 'ok') node.style.background = 'var(--ok-fill)';
 
     toastHost.appendChild(node);
     announce(message);

@@ -196,6 +196,8 @@
       currencySymbol: '$',
       currencyAfter: false,
       locale: '',
+      // 'system' follows the device; 'light' and 'dark' override it.
+      theme: 'system',
       taxEnabled: false,
       taxRate: 0,
       taxLabel: 'Tax',
