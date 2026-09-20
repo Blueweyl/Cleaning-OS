@@ -541,12 +541,9 @@ button.listrow:hover, .listrow--tap:hover { border-color: var(--brand-border); }
   .table__row  { grid-template-columns: 1fr auto; row-gap: var(--s-2); }
 }
 
-/* On the narrowest phones still sold, four tabs on one line ellipsised down to
-   "T...", "Up...", "Re...", "Co..." — unreadable, and there is no way to tell
-   which one you are on. They wrap onto a second line instead. */
-/* Four tabs ellipsised down to "T...", "Up...", "Re...", "Co..." on the
-   narrowest phones, with no way to tell which one you were on. They wrap onto
-   a second line, and a job row tightens up to buy the name more room. */
+/* Four tabs on one line ellipsised down to "T...", "Up...", "Re...", "Co..." on
+   the narrowest phones, with no way to tell which one you were on. They wrap
+   onto a second line, and a job row tightens up to buy the name more room. */
 @media (max-width: 400px) {
   .tabs { flex-wrap: wrap; }
   .listrow { gap: var(--s-3); row-gap: var(--s-2); }
