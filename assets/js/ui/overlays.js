@@ -90,6 +90,17 @@
     function close(result) {
       if (closed) return;
       closed = true;
+
+      // A click the browser queued before this overlay closed is still
+      // delivered to the button inside it, detached or not: a fast double-tap
+      // on Save Payment ran the handler twice and banked the amount twice —
+      // 250 against a 500 invoice became 500, and the client was marked paid
+      // in full for half the money. The panel swallows anything that arrives
+      // after the decision has been taken, which covers every modal, sheet and
+      // drawer rather than each Save button remembering to guard itself.
+      panel.addEventListener('click', swallow, true);
+      panel.addEventListener('keydown', swallow, true);
+
       if (release) release();
       if (scrim.parentNode) scrim.parentNode.removeChild(scrim);
       openLayers = openLayers.filter(function (l) { return l !== close; });
@@ -104,6 +115,11 @@
         e.preventDefault();
         close();
       }
+    }
+
+    function swallow(e) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
     }
 
     var panel = config.build(close);

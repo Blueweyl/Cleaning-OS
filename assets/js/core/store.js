@@ -85,6 +85,15 @@
       undoStack.length = 0;
       invalidateDerived();
       notify();
+
+      // An open modal describes that same replaced database, and this runs at
+      // the moment a second tab takes over the writer role: a Record Payment
+      // modal opened here before the other tab restored a backup could still
+      // be saved afterwards, banking the money onto whatever invoice held that
+      // id in the restored file. Only a takeover reaches this, never an
+      // ordinary cross-tab save, so nothing half-typed is lost to routine sync.
+      if (CF.ui && CF.ui.closeOverlays) CF.ui.closeOverlays();
+
       return true;
     }).catch(function () { return false; });
   }
