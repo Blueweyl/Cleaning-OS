@@ -493,7 +493,12 @@
 .list { display: flex; flex-direction: column; gap: var(--s-3); }
 
 .listrow {
-  display: flex; align-items: center; gap: var(--s-4);
+  /* A flex child will not shrink past its own content, so a row with a long
+     client name pushed the price and the status badge off the end: the badge
+     vanished at 390px and at 320px the price printed on top of the name. The
+     row wraps instead — only when the content genuinely does not fit, so a row
+     that fitted on one line before still does. */
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-xl); padding: var(--s-4) var(--s-5);
   width: 100%; font: inherit; color: inherit; text-align: left;
@@ -504,7 +509,12 @@ button.listrow:hover, .listrow--tap:hover { border-color: var(--brand-border); }
 .listrow__sub   { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 .listrow__time  { font-size: var(--t-base); font-weight: 800; color: var(--brand-text);
                   min-width: 88px; flex-shrink: 0; }
-.listrow__price { font-size: 15px; font-weight: 800; }
+/* .grow is flex:1;min-width:0, so this column could be squeezed to nothing and
+   its text then printed straight over the price — "$120" on top of "Sarah
+   Miller" on the Jobs list at 390px, the commonest phone width. A floor stops
+   that; when the floor will not fit, the row above wraps instead of overlapping. */
+.listrow > .grow { min-width: 8.5rem; }
+.listrow__price { font-size: 15px; font-weight: 800; flex-shrink: 0; }
 .listrow__rule  { width: 1px; height: 30px; background: var(--border-soft); flex-shrink: 0; }
 
 .table { background: var(--surface); border: 1px solid var(--border);
@@ -529,6 +539,18 @@ button.listrow:hover, .listrow--tap:hover { border-color: var(--brand-border); }
 @media (max-width: 860px) {
   .table__head { display: none; }
   .table__row  { grid-template-columns: 1fr auto; row-gap: var(--s-2); }
+}
+
+/* On the narrowest phones still sold, four tabs on one line ellipsised down to
+   "T...", "Up...", "Re...", "Co..." — unreadable, and there is no way to tell
+   which one you are on. They wrap onto a second line instead. */
+/* Four tabs ellipsised down to "T...", "Up...", "Re...", "Co..." on the
+   narrowest phones, with no way to tell which one you were on. They wrap onto
+   a second line, and a job row tightens up to buy the name more room. */
+@media (max-width: 400px) {
+  .tabs { flex-wrap: wrap; }
+  .listrow { gap: var(--s-3); row-gap: var(--s-2); }
+  .listrow__time { min-width: 72px; }
 }
 
 /* Accordion (client profile) */
