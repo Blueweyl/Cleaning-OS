@@ -892,6 +892,21 @@
     if (typeof status !== 'string' || QUOTE_STATUSES.indexOf(status) === -1) {
       return warn('That is not a quote status');
     }
+
+    // Accepting is an agreement, so it is where a quote's story ends. The screen
+    // already hides Mark Sent and Mark Declined on an accepted quote, but only
+    // the screen did: moving one back to sent or declined here left the booked
+    // job standing and took the quote out of `accepted`, which is the state
+    // acceptQuote checks to know it has already been honoured. Accepting it a
+    // second time then booked a second clean for one agreed price — the same
+    // double-booking the double-tap guard exists to prevent, reached the long
+    // way round. Cancelling the work is a change to the job, not a rewrite of
+    // what was agreed.
+    var current = S().find('quotes', quoteId);
+    if (current && current.status === 'accepted' && status !== 'accepted') {
+      return warn('This quote was accepted and booked, so its status cannot change');
+    }
+
     var patch = { status: status };
     if (status === 'sent') patch.sentDate = F().today();
     return S().update('quotes', quoteId, patch, 'Quote ' + status);

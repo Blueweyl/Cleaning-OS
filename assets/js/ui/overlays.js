@@ -22,11 +22,28 @@
       document.body.appendChild(toastHost);
     }
 
+    // A toast's Undo names one change, and it is offered for six seconds. The
+    // change it means is whatever sits at the top of the undo stack right now,
+    // so remember it: by the time the button is pressed the owner may have done
+    // something else, and undoing *that* instead is a silent loss of whatever
+    // they did in between. See store.undoHandle.
+    var undoHandle = opts.undo && CF.store && CF.store.undoHandle
+      ? CF.store.undoHandle() : null;
+
     var node = el('div.toast.anim-pop', [
       el('span', message),
       opts.undo ? el('button.toast__undo', {
         type: 'button',
-        onclick: function () { opts.undo(); dismiss(); }
+        onclick: function () {
+          if (CF.store && CF.store.undoHandle &&
+              CF.store.undoHandle() !== undoHandle) {
+            dismiss();
+            toast('Too late to undo — you have changed something else since.');
+            return;
+          }
+          opts.undo();
+          dismiss();
+        }
       }, opts.undoLabel || 'Undo') : null
     ]);
 
@@ -263,6 +280,29 @@
     });
   }
 
+  /**
+   * Dismiss every open modal, sheet, drawer and confirm dialog.
+   *
+   * Called when the whole database is swapped out from under the screen. An
+   * overlay lives in `document.body`, outside the region a repaint rebuilds,
+   * so it survived a restore with its closure still pointing at the business
+   * that had just been replaced: a Record Payment modal opened against
+   * Alpha's INV-001 banked $500 onto whatever invoice happened to hold the
+   * same id in the restored file — a different client, in a different
+   * business, with no warning. Ids are sequential, so a collision is the
+   * normal case rather than bad luck.
+   *
+   * Toasts are deliberately left alone: they carry the message announcing the
+   * restore, and they cannot write anything.
+   */
+  function closeOverlays() {
+    // A copy, because each close() splices itself out of openLayers.
+    openLayers.slice().forEach(function (close) {
+      // A view's onClose must not be able to fail a restore half-way.
+      try { close(); } catch (e) { /* the layer is gone either way */ }
+    });
+  }
+
   CF.ui = CF.ui || {};
   CF.ui.toast = toast;
   CF.ui.modal = modal;
@@ -271,4 +311,5 @@
   CF.ui.confirm = confirm;
   CF.ui.copy = copy;
   CF.ui.overlay = overlay;
+  CF.ui.closeOverlays = closeOverlays;
 })(window.CF = window.CF || {});

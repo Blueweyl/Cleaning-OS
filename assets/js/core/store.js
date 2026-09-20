@@ -301,11 +301,27 @@
   }
 
   function pushUndo(label) {
-    undoStack.push({ label: label, snapshot: JSON.stringify(db) });
+    undoStack.push({ id: uid('undo'), label: label, snapshot: JSON.stringify(db) });
     if (undoStack.length > MAX_UNDO) undoStack.shift();
   }
 
   function canUndo() { return undoStack.length > 0; }
+
+  /**
+   * An identifier for the change currently at the top of the undo stack.
+   *
+   * `undo()` pops whatever is newest, which is right for an Undo control that
+   * means "the last thing I did" but wrong for the Undo offered inside a toast:
+   * that one names a specific change and stays on screen for six seconds. Make
+   * another change in those six seconds and the toast took back the wrong one —
+   * tapping "Quote marked declined · Undo" after booking the job deleted the job
+   * and the client it had just created, and said nothing. A toast records this
+   * handle when it appears and compares it before acting.
+   */
+  function undoHandle() {
+    var top = undoStack[undoStack.length - 1];
+    return top ? top.id : null;
+  }
 
   function undo() {
     var entry = undoStack.pop();
@@ -327,6 +343,17 @@
     invalidateDerived();
     schedule();
     notify();
+
+    // Every screen is rebuilt by the notify above, but an open modal is not:
+    // it sits outside the repainted region holding a reference to the business
+    // that has just been replaced, and its Save button still works. Eight
+    // places replace the database — restore, recover, reset, erase, demo — and
+    // each was closing only the one drawer it happened to know about. The swap
+    // is the single fact they share, so the stale overlays are dismissed here.
+    // This is the one call that reaches from the store up to the UI; leaving it
+    // to the callers is what let the modal through in the first place.
+    if (CF.ui && CF.ui.closeOverlays) CF.ui.closeOverlays();
+
     return db;
   }
 
@@ -410,7 +437,8 @@
 
   CF.store = {
     init: init, get: get, subscribe: subscribe, notify: notify,
-    commit: commit, transaction: transaction, undo: undo, canUndo: canUndo, replace: replace,
+    commit: commit, transaction: transaction, undo: undo, canUndo: canUndo,
+    undoHandle: undoHandle, replace: replace,
     refreshFromDisk: refreshFromDisk,
     all: all, find: find, insert: insert, update: update,
     remove: remove, restore: restore,

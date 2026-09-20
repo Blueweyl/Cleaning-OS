@@ -319,7 +319,9 @@ history of work already done.
 ## Handy to know
 
 - Press **`/`** or **Ctrl/Cmd + K** to search anything
-- **Undo** appears in the toast after most changes
+- **Undo** appears in the toast after most changes, and it only ever takes back
+  the change it names — if you have done something else since, it says so
+  instead of undoing that
 - Anything destructive asks first, and says exactly what will happen
 - Long lists show the most recent 200 with a **Show all** link underneath, so a
   few years of finished jobs never leaves you waiting for the screen to draw
